@@ -43,8 +43,11 @@ Ant antMove(const unsigned char w[3][4], Ant a){
     else
         a = moveAntEast(a);
 
-    a.foodCount += getContent(w,a.x,a.y);
+    return a;
+}
 
+Ant antHarvest(const unsigned char w[3][4], Ant a){
+    a.foodCount += getContent(w,a.x,a.y);
     return a;
 }
 
@@ -55,7 +58,13 @@ void ant(const unsigned char w[3][4], Ant a, chanend antChan){
         printf("And %i has collected %i food.\n", a.id,  a.foodCount);
         antChan :> temp;
 
-        a = antMove(w, a);
+        if(temp == 0){
+            a = antMove(w, a);
+            a = antMove(w, a);
+        }
+        else{
+            a = antHarvest(w, a);
+        }
     }
 }
 
