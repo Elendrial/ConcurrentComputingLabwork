@@ -175,7 +175,7 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 //                      has moved to winning positions.
 void controller(chanend fromAttacker, chanend fromUser) {
     unsigned int lastReportedUserAntPosition = 11;        //position last reported by userAnt
-    unsigned int lastReportedAttackerAntPosition = 5;     //position last reported by attackerAnt
+    unsigned int lastReportedAttackerAntPosition = 2;     //position last reported by attackerAnt
     unsigned int attempt = 0;                             //incoming data from ants
     int gameEnded = 0;                                    //indicates if game is over
     fromUser :> attempt;                                  //start game when user moves
@@ -183,18 +183,26 @@ void controller(chanend fromAttacker, chanend fromUser) {
     while (!gameEnded) {
         select {
             case fromAttacker :> attempt:
-            /////////////////////////////////////////////////////////////
-            //
-            // !!! place your code here to give permission/deny attacker move or to end game
-            //
-            /////////////////////////////////////////////////////////////
+                if(attempt == lastReportedUserAntPosition) fromAttacker <: 1; // Fail
+                else {
+                    fromAttacker <: 0; // Success
+                    lastReportedAttackerAntPosition = attempt;
+
+                    // Has attacker won?
+                    if(lastReportedAttackerAntPosition  >= 8 && lastReportedAttackerAntPosition <= 14){
+                        printstr("Defender has lost!");
+                        exit(0);
+                    }
+                }
+
                 break;
+
             case fromUser :> attempt:
-            /////////////////////////////////////////////////////////////
-            //
-            // !!! place your code here to give permission/deny user move
-            //
-            /////////////////////////////////////////////////////////////
+                if(attempt == lastReportedAttackerAntPosition) fromUser <: 1; // Fail
+                else {
+                    fromUser <: 0; // Success
+                    lastReportedUserAntPosition = attempt;
+                }
                 break;
         }
     }
