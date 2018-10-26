@@ -15,7 +15,7 @@
 on tile[0] : in port buttons = XS1_PORT_4E; //port to access xCore-200 buttons
 on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
 
-/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////0//////////////////////////////////////////
 //
 //    Helper Functions provided for you
 //
@@ -136,12 +136,19 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
     toVisualiser <: attackerAntPosition;     //show initial position
 
     while (running) {
-        ////////////////////////////////////////////////////////////
-        //
-        // !!! place your code here for attacker behaviour
-        //
-        /////////////////////////////////////////////////////////////
-        attackerAntPosition++;
+        moveCounter ++;
+        if(!moveCounter%31 || !moveCounter%37)
+            currentDirection *= -1;
+        attemptedAntPosition = (attackerAntPosition + currentDirection) % 23;
+
+        toController <: attemptedAntPosition;
+        toController :> moveForbidden;
+
+        if (moveForbidden)
+            currentDirection *= -1;
+        else
+            attackerAntPosition = attemptedAntPosition;
+
         toVisualiser <: attackerAntPosition;
         waitMoment();
     }
