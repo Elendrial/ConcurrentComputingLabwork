@@ -115,11 +115,27 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
     toVisualiser <: userAntPosition;           //show initial position
     while (1) {
         fromButtons :> buttonInput; //expect values 13 and 14
-        ////////////////////////////////////////////////////////////
-        //
-        // !!! place code here for userAnt behaviour
-        //
-        /////////////////////////////////////////////////////////////
+
+        if(buttonInput == 13){
+            // Move Left
+
+            attemptedAntPosition = userAntPosition-1;
+            toController <: attemptedAntPosition;
+            toController :> moveForbidden;
+
+            if(moveForbidden == 0) userAntPosition = attemptedAntPosition;
+
+        }
+        else if(buttonInput == 14){
+            // Move Right
+
+            attemptedAntPosition = userAntPosition+1;
+            toController <: attemptedAntPosition;
+            toController :> moveForbidden;
+
+            if(moveForbidden == 0) userAntPosition = attemptedAntPosition;
+        }
+
         toVisualiser <: userAntPosition;
     }
 }
