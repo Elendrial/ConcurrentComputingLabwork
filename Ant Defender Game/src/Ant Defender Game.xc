@@ -153,9 +153,9 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 
     while (running) {
         moveCounter ++;
-        if(!moveCounter%31 || !moveCounter%37)
+        if(moveCounter%31==0 || moveCounter%37==0)
             currentDirection *= -1;
-        attemptedAntPosition = (attackerAntPosition + currentDirection) % 23;
+        attemptedAntPosition = (attackerAntPosition + currentDirection + 23) % 23;
 
         toController <: attemptedAntPosition;
         toController :> moveForbidden;
