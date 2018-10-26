@@ -113,28 +113,21 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
     unsigned int attemptedAntPosition = 0;     //the next attempted defender position after considering button
     int moveForbidden;                         //the verdict of the controller if move is allowed
     toVisualiser <: userAntPosition;           //show initial position
+
+    int moveDirection = 0;
     while (1) {
+
         fromButtons :> buttonInput; //expect values 13 and 14
 
-        if(buttonInput == 13){
-            // Move Left
+        if(buttonInput == 14)      moveDirection = -1;
+        else if(buttonInput == 13) moveDirection = 1;
+        else                       moveDirection = 0;
 
-            attemptedAntPosition = userAntPosition-1;
-            toController <: attemptedAntPosition;
-            toController :> moveForbidden;
+        attemptedAntPosition = (userAntPosition + 1*moveDirection + 23) % 23;
+        toController <: attemptedAntPosition;
+        toController :> moveForbidden;
 
-            if(moveForbidden == 0) userAntPosition = attemptedAntPosition;
-
-        }
-        else if(buttonInput == 14){
-            // Move Right
-
-            attemptedAntPosition = userAntPosition+1;
-            toController <: attemptedAntPosition;
-            toController :> moveForbidden;
-
-            if(moveForbidden == 0) userAntPosition = attemptedAntPosition;
-        }
+        if(moveForbidden == 0) userAntPosition = attemptedAntPosition;
 
         toVisualiser <: userAntPosition;
     }
