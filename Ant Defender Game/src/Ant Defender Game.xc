@@ -191,7 +191,7 @@ void controller(chanend fromAttacker, chanend fromUser) {
                     // Has attacker won?
                     if(lastReportedAttackerAntPosition  >= 8 && lastReportedAttackerAntPosition <= 14){
                         printstr("Defender has lost!");
-                        exit(0);
+                        gameEnded = 1;
                     }
                 }
 
