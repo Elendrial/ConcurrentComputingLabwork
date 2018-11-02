@@ -1,4 +1,9 @@
 .metadata/
 .build/
 bin
+.settings
+.cproject
+.project
+*.xn
 *.xscope
+Makefile
