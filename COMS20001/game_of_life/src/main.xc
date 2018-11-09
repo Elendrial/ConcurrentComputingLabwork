@@ -70,6 +70,14 @@ void DataInStream(char infname[], chanend c_out, chanend fromController)
   return;
 }
 
+//WAIT function
+void waitMoment(int tenNano) {
+    timer tmr;
+    int waitTime;
+    tmr :> waitTime;                       //read current timer value
+    waitTime += tenNano;                  //set waitTime to 0.4s after value
+    tmr when timerafter(waitTime) :> void; //wait until waitTime is reached
+}
 
 /////// The Rules of Game of Life
 
@@ -142,19 +150,47 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 
-//DISPLAYS an LED pattern
-int showLEDs(out port p, chanend fromController) {
-    int pattern; //1st bit...separate green LED
-                 //2nd bit...blue LED
-                 //3rd bit...green LED
-                 //4th bit...red LED
+int ledPattern;
 
-    while (1) {
-        fromController :> pattern;     //receive new pattern from visualiser
-        p <: pattern;                  //send pattern to LED port
+// Decodes LED pattern
+void controlLEDs(chanend fromController) {
+    int state;
+    while(fromController :> state){
+            ledPattern = state;
+        }
     }
-    return 0;
 }
+
+//DISPLAYS an LED pattern
+void showLEDs(out port p){
+    int pattern;
+    int counter = 0;
+    int toPort;//1st bit...separate green LED
+               //2nd bit...blue LED
+               //3rd bit...green LED
+               //4th bit...red LED
+
+    while(1){
+        if(pattern != ledPattern){
+            counter = 0;
+            pattern = ledPattern;
+        }
+
+        switch(pattern){
+        case 0 : toPort = 0; break;
+        case 1 : toPort = (counter % 2 == 0) ? 1 : 0; break;
+        case 2 : toPort = 2; break;
+        default : toPort = 0; break;
+        }
+
+        counter++;
+        p <: toPort;
+        wait(50000000);
+    }
+
+}
+
+
 
 //READ BUTTONS and send button pattern to userAnt
 void buttonListener(in port b, chanend toController) {
@@ -267,7 +303,8 @@ par {
     i2c_master(i2c, 1, p_scl, p_sda, 10);               //server thread providing orientation data
     orientation(i2c[0], c_orientation);                 //client thread reading orientation data
     buttonListener(buttons, c_buttonListener);          //thread reading button information data
-    showLEDs(leds, c_leds);                             //thread setting LEDs
+    controlLEDs(c_leds);                             //thread setting LEDs
+    showLEDs(leds);
     DataInStream(infname, c_inIO, c_controllerIn);           //thread to read in a PGM image
     DataOutStream(outfname, c_outIO, c_controllerOut);        //thread to write out a PGM image
     distributor(c_inIO, c_outIO, c_distributor);            //thread to coordinate work on image
