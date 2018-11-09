@@ -10,6 +10,7 @@
 
 #define  IMHT 16                  //image height
 #define  IMWD 16                  //image width
+#define  PTHT 4                   //image part height
 
 typedef unsigned char uchar;      //using uchar as shorthand
 
@@ -123,6 +124,17 @@ void distributor(chanend c_in, chanend c_out, chanend fromController)
     }
   }
 
+  int lineIndex = 0;
+  // Split img
+//  while (lineIndex < IMHT) {
+//      lineIndex += PTHT;
+//
+//  }
+//  // process with img parts
+//  par {
+//
+//
+//  }
   for( int y = 0; y < IMHT; y++ ) {   //go through all lines
       for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
           c_out <: image[y][x]; //send some modified pixel out
@@ -130,8 +142,11 @@ void distributor(chanend c_in, chanend c_out, chanend fromController)
   }
 
   printf( "\nOne processing round completed...\n" );
+  fromController <: 0;
 }
 
+
+void processImgPart(chanend fromAbove, chanend fromBelow) {}
 
 
 void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend toleds, chanend dataIn, chanend dataOut){
