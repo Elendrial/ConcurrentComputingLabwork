@@ -156,9 +156,9 @@ int ledPattern;
 void controlLEDs(chanend fromController) {
     int state;
     while(fromController :> state){
-            ledPattern = state;
-        }
+        ledPattern = state;
     }
+
 }
 
 //DISPLAYS an LED pattern
