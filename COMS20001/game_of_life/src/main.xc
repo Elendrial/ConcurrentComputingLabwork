@@ -98,7 +98,7 @@ int isAliveNextRound(int i[9]){
 /////////////////////////////////////////////////////////////////////////////////////////
 void distributor(chanend c_in, chanend c_out, chanend fromController)
 {
-  uchar val;
+  uchar image[IMHT][IMWD];
 
   //Starting up and wait for tilting of the xCore-200 Explorer
   printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
@@ -108,15 +108,23 @@ void distributor(chanend c_in, chanend c_out, chanend fromController)
   //Read in and do something with your image values..
   //This just inverts every pixel, but you should
   //change the image according to the "Game of Life"
-  printf( "Processing...\n" );
+  printf( "Waiting for image...\n" );
   for( int y = 0; y < IMHT; y++ ) {   //go through all lines
     for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-      c_in :> val;                    //read the pixel value
-      c_out <: (uchar)( val ^ 0xFF ); //send some modified pixel out
+      c_in :> image[y][x];                    //read the pixel value
     }
   }
+
+  for( int y = 0; y < IMHT; y++ ) {   //go through all lines
+      for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
+          c_out <: image[y][x]; //send some modified pixel out
+      }
+  }
+
   printf( "\nOne processing round completed...\n" );
 }
+
+
 
 void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend toleds, chanend dataIn, chanend dataOut){
     while(running == 0){
