@@ -108,6 +108,36 @@ void distributor(chanend c_in, chanend c_out, chanend fromAcc)
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //
+// Buttons
+//
+/////////////////////////////////////////////////////////////////////////////////////////
+
+//DISPLAYS an LED pattern
+int showLEDs(out port p, chanend fromVisualiser) {
+    int pattern; //1st bit...separate green LED
+                             //2nd bit...blue LED
+                             //3rd bit...green LED
+                             //4th bit...red LED
+    while (1) {
+        fromVisualiser :> pattern;     //receive new pattern from visualiser
+        p <: pattern;                  //send pattern to LED port
+    }
+    return 0;
+}
+
+//READ BUTTONS and send button pattern to userAnt
+void buttonListener(in port b, chanend toUserAnt) {
+    int r;
+    while (1) {
+        b when pinseq(15)  :> r;    // check that no button is pressed
+        b when pinsneq(15) :> r;    // check if some buttons are pressed
+        if ((r==13) || (r==14))     // if either button is pressed
+            toUserAnt <: r;         // send button pattern to userAnt
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//
 // Write pixel stream from channel c_in to PGM image file
 //
 /////////////////////////////////////////////////////////////////////////////////////////
