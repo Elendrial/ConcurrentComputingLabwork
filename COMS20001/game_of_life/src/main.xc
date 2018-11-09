@@ -111,7 +111,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromController)
   //Starting up and wait for tilting of the xCore-200 Explorer
   printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
   printf( "Waiting for Board Tilt...\n" );
-  fromAcc :> int value;
+  fromController :> int value;
 
   //Read in and do something with your image values..
   //This just inverts every pixel, but you should
@@ -163,7 +163,8 @@ int ledPattern;
 // Decodes LED pattern
 void controlLEDs(chanend fromController) {
     int state;
-    while(fromController :> state){
+    while(1){
+        fromController :> state;
         ledPattern = state;
     }
 
@@ -193,7 +194,7 @@ void showLEDs(out port p){
 
         counter++;
         p <: toPort;
-        wait(50000000);
+        waitMoment(50000000);
     }
 
 }
@@ -286,7 +287,7 @@ void orientation(client interface i2c_master_if i2c, chanend toController) {
     if (!tilted) {
       if (x>30) {
         tilted = 1 - tilted;
-        toDist <: 1;
+        toController <: 1;
       }
     }
   }
