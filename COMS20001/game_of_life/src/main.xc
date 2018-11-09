@@ -39,8 +39,10 @@ on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
 /////////////////////////////////////////////////////////////////////////////////////////
 void DataInStream(char infname[], chanend c_out, chanend fromController)
 {
-  int res;
+  int res, start;
   uchar line[ IMWD ];
+
+  fromController :> start;
   printf( "DataInStream: Start...\n" );
 
   //Open PGM file
@@ -62,7 +64,9 @@ void DataInStream(char infname[], chanend c_out, chanend fromController)
 
   //Close PGM image file
   _closeinpgm();
+
   printf( "DataInStream: Done...\n" );
+  fromController <: 0;
   return;
 }
 
@@ -170,29 +174,34 @@ void buttonListener(in port b, chanend toController) {
 /////////////////////////////////////////////////////////////////////////////////////////
 void DataOutStream(char outfname[], chanend c_in, chanend fromController)
 {
-  int res;
+  int res, start;
   uchar line[ IMWD ];
 
-  //Open PGM file
-  printf( "DataOutStream: Start...\n" );
-  res = _openoutpgm( outfname, IMWD, IMHT );
-  if( res ) {
-    printf( "DataOutStream: Error opening %s\n.", outfname );
-    return;
-  }
+  while(1) {
+      fromController :> start;
 
-  //Compile each line of the image and write the image line-by-line
-  for( int y = 0; y < IMHT; y++ ) {
-    for( int x = 0; x < IMWD; x++ ) {
-      c_in :> line[ x ];
-    }
-    _writeoutline( line, IMWD );
-    printf( "DataOutStream: Line written...\n" );
-  }
+      //Open PGM file
+      printf( "DataOutStream: Start...\n" );
+      res = _openoutpgm( outfname, IMWD, IMHT );
+      if( res ) {
+        printf( "DataOutStream: Error opening %s\n.", outfname );
+        return;
+      }
 
-  //Close the PGM image
-  _closeoutpgm();
-  printf( "DataOutStream: Done...\n" );
+      //Compile each line of the image and write the image line-by-line
+      for( int y = 0; y < IMHT; y++ ) {
+        for( int x = 0; x < IMWD; x++ ) {
+          c_in :> line[ x ];
+        }
+        _writeoutline( line, IMWD );
+        printf( "DataOutStream: Line written...\n" );
+      }
+
+      //Close the PGM image
+      _closeoutpgm();
+      printf( "DataOutStream: Done...\n" );
+      fromController <: 0;
+  }
   return;
 }
 
