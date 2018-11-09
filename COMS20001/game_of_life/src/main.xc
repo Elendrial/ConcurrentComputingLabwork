@@ -119,11 +119,12 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
         int buttonPress;
         fromButtonListener :> buttonPress;
         if(buttonPress == 14){
-            dataIn :> 1;
+            dataIn <: 1; // Tell dataIn to read in the data
+            toleds <: 1; // Set leds to state 1 (green on)
+            dataIn :> buttonPress;// doesn't matter what this is, just that we get it. Indicates reading data is over.
 
-
-
-            running = 1;
+            toleds <: 2; // Set leds to state 2 (green flash)
+            running = 1; // Set running to 1.
         }
     }
 
