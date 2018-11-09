@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include "pgmIO.h"
 #include "i2c.h"
+#include <stdbool.h>
 
 #define  IMHT 16                  //image height
 #define  IMWD 16                  //image width
@@ -58,6 +59,22 @@ void DataInStream(char infname[], chanend c_out)
   _closeinpgm();
   printf( "DataInStream: Done...\n" );
   return;
+}
+
+int isAliveNextRound(int i[9]){
+    int middleAlive = i[4];
+    int amountAlive = 0;
+    for(int c = 0; c < 9; c++){
+        if(c) amountAlive++;
+    }
+
+    int alive = 0;
+
+    if(middleAlive && amountAlive > 1 && amountAlive < 4) alive = 1;
+    else if(!middleAlive && amountAlive > 2) alive = 1;
+
+    return 0;
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -177,6 +194,7 @@ i2c_master_if i2c[1];               //interface to orientation
 char infname[] = "test.pgm";     //put your input image path here
 char outfname[] = "testout.pgm"; //put your output image path here
 chan c_inIO, c_outIO, c_control;    //extend your channel definitions here
+
 
 par {
     i2c_master(i2c, 1, p_scl, p_sda, 10);   //server thread providing orientation data
