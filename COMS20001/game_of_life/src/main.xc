@@ -141,13 +141,36 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
         if(buttonPress == 14){
             dataIn <: 1; // Tell dataIn to read in the data
             toleds <: 1; // Set leds to state 1 (green on)
-            dataIn :> buttonPress;// doesn't matter what this is, just that we get it. Indicates reading data is over.
 
+            dataIn :> buttonPress: // If we hear from dataIn, we know data reading is over.
             toleds <: 2; // Set leds to state 2 (green flash)
             running = 1; // Set running to 1.
         }
     }
 
+    int input;
+    while(running == 1){
+        select{
+            case toDistributor :> input:
+                break;
+
+            case fromAccelerometer :> input:
+                break;
+
+            case fromButtonListener :> input:
+                break;
+
+            case toleds :> input:
+                toleds <: 1;
+                break;
+
+            case dataIn :> input:
+                break;
+
+            case dataOut :> input:
+                break;
+        }
+    }
 
 
 }
@@ -158,39 +181,25 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 
-int ledPattern;
-
 // Decodes LED pattern
-void controlLEDs(chanend fromController) {
-    int state;
+void controlLEDs(out port p, chanend fromController) {
+    int state, toPort;
     while(1){
         fromController :> state;
-        ledPattern = state;
-    }
 
-}
+        switch(state){
 
-//DISPLAYS an LED pattern
-void showLEDs(out port p){
-    int pattern;
-    int counter = 0;
-    int toPort;//1st bit...separate green LED
-               //2nd bit...blue LED
-               //3rd bit...green LED
-               //4th bit...red LED
+        case 0: toPort = 0; break;
 
-    while(1){
-        if(pattern != ledPattern){
-            counter = 0;
-            pattern = ledPattern;
-        }
+        case 1: toPort = 1; break;
 
-        switch(pattern){
-        case 0 : toPort = 0; break;
-        case 1 : toPort = (counter % 2 == 0) ? 1 : 0; break;
-        case 2 : toPort = 2; break;
-        default : toPort = 0; break;
-        }
+        case 2:
+            toPort = 1;
+            p <: toPort;
+            waitMoment(50000000);
+            toPort = 0;
+            fromController :> 1;
+            break;
 
         counter++;
         p <: toPort;
@@ -312,8 +321,7 @@ par {
     i2c_master(i2c, 1, p_scl, p_sda, 10);               //server thread providing orientation data
     orientation(i2c[0], c_orientation);                 //client thread reading orientation data
     buttonListener(buttons, c_buttonListener);          //thread reading button information data
-    controlLEDs(c_leds);                             //thread setting LEDs
-    showLEDs(leds);
+    controlLEDs(leds, c_leds);                             //thread setting LEDs
     DataInStream(infname, c_inIO, c_controllerIn);           //thread to read in a PGM image
     DataOutStream(outfname, c_outIO, c_controllerOut);        //thread to write out a PGM image
     distributor(c_inIO, c_outIO, c_distributor);            //thread to coordinate work on image
