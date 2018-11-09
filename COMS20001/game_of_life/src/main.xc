@@ -38,37 +38,36 @@ on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
 // Read Image from PGM file from path infname[] to channel c_out
 //
 /////////////////////////////////////////////////////////////////////////////////////////
-void DataInStream(char infname[], chanend c_out, chanend fromController)
-{
-  int res, start;
-  uchar line[ IMWD ];
+void DataInStream(char infname[], chanend c_out, chanend fromController){
+    int res, start;
+    uchar line[ IMWD ];
 
-  fromController :> start;
-  printf( "DataInStream: Start...\n" );
+    fromController :> start;
+    printf( "DataInStream: Start...\n" );
 
-  //Open PGM file
-  res = _openinpgm( infname, IMWD, IMHT );
-  if( res ) {
-    printf( "DataInStream: Error openening %s\n.", infname );
-    return;
-  }
-
-  //Read image line-by-line and send byte by byte to channel c_out
-  for( int y = 0; y < IMHT; y++ ) {
-    _readinline( line, IMWD );
-    for( int x = 0; x < IMWD; x++ ) {
-      c_out <: line[ x ];
-      printf( "-%4.1d ", line[ x ] ); //show image values
+    //Open PGM file
+    res = _openinpgm( infname, IMWD, IMHT );
+    if( res ) {
+        printf( "DataInStream: Error openening %s\n.", infname );
+        return;
     }
-    printf( "\n" );
-  }
 
-  //Close PGM image file
-  _closeinpgm();
+    //Read image line-by-line and send byte by byte to channel c_out
+    for( int y = 0; y < IMHT; y++ ) {
+        _readinline( line, IMWD );
+        for( int x = 0; x < IMWD; x++ ) {
+            c_out <: line[ x ];
+            printf( "-%4.1d ", line[ x ] ); //show image values
+        }
+        printf( "\n" );
+    }
 
-  printf( "DataInStream: Done...\n" );
-  fromController <: 0;
-  return;
+    //Close PGM image file
+    _closeinpgm();
+
+    printf( "DataInStream: Done...\n" );
+    fromController <: 0;
+    return;
 }
 
 //WAIT function
@@ -105,29 +104,28 @@ int isAliveNextRound(int i[9]){
 // Currently the function just inverts the image
 //
 /////////////////////////////////////////////////////////////////////////////////////////
-void distributor(chanend c_in, chanend c_out, chanend fromController)
-{
-  uchar image[IMHT][IMWD];
+void distributor(chanend c_in, chanend c_out, chanend fromController){
+    uchar image[IMHT][IMWD];
 
-  //Starting up and wait for tilting of the xCore-200 Explorer
-  printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
-  printf( "Waiting for Board Tilt...\n" );
-  fromController :> int value;
+    //Starting up and wait for tilting of the xCore-200 Explorer
+    printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
+    printf( "Waiting for Board Tilt...\n" );
+    fromController :> int value;
 
-  //Read in and do something with your image values..
-  //This just inverts every pixel, but you should
-  //change the image according to the "Game of Life"
-  printf( "Waiting for image...\n" );
-  for( int y = 0; y < IMHT; y++ ) {   //go through all lines
-    for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-      c_in :> image[y][x];                    //read the pixel value
+    //Read in and do something with your image values..
+    //This just inverts every pixel, but you should
+    //change the image according to the "Game of Life"
+    printf( "Waiting for image...\n" );
+    for( int y = 0; y < IMHT; y++ ) {   //go through all lines
+        for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
+            c_in :> image[y][x];                    //read the pixel value
+        }
     }
-  }
 
-  int lineIndex = 0;
-  // Split img
-//  while (lineIndex < IMHT) {
-//      lineIndex += PTHT;
+    int lineIndex = 0;
+    // Split img
+    //  while (lineIndex < IMHT) {
+    //      lineIndex += PTHT;
 //
 //  }
 //  // process with img parts
@@ -135,14 +133,14 @@ void distributor(chanend c_in, chanend c_out, chanend fromController)
 //
 //
 //  }
-  for( int y = 0; y < IMHT; y++ ) {   //go through all lines
-      for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-          c_out <: image[y][x]; //send some modified pixel out
-      }
-  }
+    for( int y = 0; y < IMHT; y++ ) {   //go through all lines
+        for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
+            c_out <: image[y][x]; //send some modified pixel out
+        }
+    }
 
-  printf( "\nOne processing round completed...\n" );
-  fromController <: 0;
+    printf( "\nOne processing round completed...\n" );
+    fromController <: 0;
 }
 
 
@@ -240,37 +238,36 @@ void buttonListener(in port b, chanend toController) {
 // Write pixel stream from channel c_in to PGM image file
 //
 /////////////////////////////////////////////////////////////////////////////////////////
-void DataOutStream(char outfname[], chanend c_in, chanend fromController)
-{
-  int res, start;
-  uchar line[ IMWD ];
+void DataOutStream(char outfname[], chanend c_in, chanend fromController){
+    int res, start;
+    uchar line[ IMWD ];
 
-  while(1) {
-      fromController :> start;
+    while(1) {
+        fromController :> start;
 
-      //Open PGM file
-      printf( "DataOutStream: Start...\n" );
-      res = _openoutpgm( outfname, IMWD, IMHT );
-      if( res ) {
-        printf( "DataOutStream: Error opening %s\n.", outfname );
-        return;
-      }
-
-      //Compile each line of the image and write the image line-by-line
-      for( int y = 0; y < IMHT; y++ ) {
-        for( int x = 0; x < IMWD; x++ ) {
-          c_in :> line[ x ];
+        //Open PGM file
+        printf( "DataOutStream: Start...\n" );
+        res = _openoutpgm( outfname, IMWD, IMHT );
+        if( res ) {
+            printf( "DataOutStream: Error opening %s\n.", outfname );
+            return;
         }
-        _writeoutline( line, IMWD );
-        printf( "DataOutStream: Line written...\n" );
-      }
 
-      //Close the PGM image
-      _closeoutpgm();
-      printf( "DataOutStream: Done...\n" );
-      fromController <: 0;
-  }
-  return;
+        //Compile each line of the image and write the image line-by-line
+        for( int y = 0; y < IMHT; y++ ) {
+            for( int x = 0; x < IMWD; x++ ) {
+                c_in :> line[ x ];
+            }
+            _writeoutline( line, IMWD );
+            printf( "DataOutStream: Line written...\n" );
+        }
+
+        //Close the PGM image
+        _closeoutpgm();
+        printf( "DataOutStream: Done...\n" );
+        fromController <: 0;
+    }
+    return;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -279,41 +276,41 @@ void DataOutStream(char outfname[], chanend c_in, chanend fromController)
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 void orientation(client interface i2c_master_if i2c, chanend toController) {
-  i2c_regop_res_t result;
-  char status_data = 0;
-  int tilted = 0;
+    i2c_regop_res_t result;
+    char status_data = 0;
+    int tilted = 0;
 
-  // Configure FXOS8700EQ
-  result = i2c.write_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_XYZ_DATA_CFG_REG, 0x01);
-  if (result != I2C_REGOP_SUCCESS) {
-    printf("I2C write reg failed\n");
-  }
-  
-  // Enable FXOS8700EQ
-  result = i2c.write_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_CTRL_REG_1, 0x01);
-  if (result != I2C_REGOP_SUCCESS) {
-    printf("I2C write reg failed\n");
-  }
-
-  //Probe the orientation x-axis forever
-  while (1) {
-
-    //check until new orientation data is available
-    do {
-      status_data = i2c.read_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_DR_STATUS, result);
-    } while (!status_data & 0x08);
-
-    //get new x-axis tilt value
-    int x = read_acceleration(i2c, FXOS8700EQ_OUT_X_MSB);
-
-    //send signal to distributor after first tilt
-    if (!tilted) {
-      if (x>30) {
-        tilted = 1 - tilted;
-        toController <: 1;
-      }
+    // Configure FXOS8700EQ
+    result = i2c.write_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_XYZ_DATA_CFG_REG, 0x01);
+    if (result != I2C_REGOP_SUCCESS) {
+        printf("I2C write reg failed\n");
     }
-  }
+  
+    // Enable FXOS8700EQ
+    result = i2c.write_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_CTRL_REG_1, 0x01);
+    if (result != I2C_REGOP_SUCCESS) {
+        printf("I2C write reg failed\n");
+    }
+
+    //Probe the orientation x-axis forever
+    while (1) {
+
+        //check until new orientation data is available
+        do {
+            status_data = i2c.read_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_DR_STATUS, result);
+        } while (!status_data & 0x08);
+
+        //get new x-axis tilt value
+        int x = read_acceleration(i2c, FXOS8700EQ_OUT_X_MSB);
+
+        //send signal to distributor after first tilt
+        if (!tilted) {
+            if (x>30) {
+                tilted = 1 - tilted;
+                toController <: 1;
+            }
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -323,24 +320,24 @@ void orientation(client interface i2c_master_if i2c, chanend toController) {
 /////////////////////////////////////////////////////////////////////////////////////////
 int main(void) {
 
-i2c_master_if i2c[1];               //interface to orientation
+    i2c_master_if i2c[1];               //interface to orientation
 
-char infname[] = "test.pgm";     //put your input image path here
-char outfname[] = "testout.pgm"; //put your output image path here
-chan c_inIO, c_outIO, c_orientation, c_buttonListener, c_distributor, c_leds, c_controllerIn, c_controllerOut;    //extend your channel definitions here
+    char infname[] = "test.pgm";     //put your input image path here
+    char outfname[] = "testout.pgm"; //put your output image path here
+    chan c_inIO, c_outIO, c_orientation, c_buttonListener, c_distributor, c_leds, c_controllerIn, c_controllerOut;    //extend your channel definitions here
 
-running = 0;
+    running = 0;
 
-par {
-    i2c_master(i2c, 1, p_scl, p_sda, 10);               //server thread providing orientation data
-    orientation(i2c[0], c_orientation);                 //client thread reading orientation data
-    buttonListener(buttons, c_buttonListener);          //thread reading button information data
-    controlLEDs(leds, c_leds);                             //thread setting LEDs
-    DataInStream(infname, c_inIO, c_controllerIn);           //thread to read in a PGM image
-    DataOutStream(outfname, c_outIO, c_controllerOut);        //thread to write out a PGM image
-    distributor(c_inIO, c_outIO, c_distributor);            //thread to coordinate work on image
-    controller(c_distributor, c_orientation, c_buttonListener, c_leds, c_controllerIn, c_controllerOut); // Controller thread.
-  }
+    par {
+        i2c_master(i2c, 1, p_scl, p_sda, 10);               //server thread providing orientation data
+        orientation(i2c[0], c_orientation);                 //client thread reading orientation data
+        buttonListener(buttons, c_buttonListener);          //thread reading button information data
+        controlLEDs(leds, c_leds);                             //thread setting LEDs
+        DataInStream(infname, c_inIO, c_controllerIn);           //thread to read in a PGM image
+        DataOutStream(outfname, c_outIO, c_controllerOut);        //thread to write out a PGM image
+        distributor(c_inIO, c_outIO, c_distributor);            //thread to coordinate work on image
+        controller(c_distributor, c_orientation, c_buttonListener, c_leds, c_controllerIn, c_controllerOut); // Controller thread.
+    }
 
-  return 0;
+    return 0;
 }
