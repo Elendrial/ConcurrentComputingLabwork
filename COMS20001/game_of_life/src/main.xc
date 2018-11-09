@@ -157,7 +157,7 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
             dataIn <: 1; // Tell dataIn to read in the data
             toleds <: 1; // Set leds to state 1 (green on)
 
-            dataIn :> buttonPress: // If we hear from dataIn, we know data reading is over.
+            dataIn :> buttonPress; // If we hear from dataIn, we know data reading is over.
             toleds <: 2; // Set leds to state 2 (green flash)
             running = 1; // Set running to 1.
         }
@@ -213,14 +213,13 @@ void controlLEDs(out port p, chanend fromController) {
             p <: toPort;
             waitMoment(50000000);
             toPort = 0;
-            fromController :> 1;
+            fromController <: 1;
             break;
 
-        counter++;
         p <: toPort;
         waitMoment(50000000);
+        }
     }
-
 }
 
 
