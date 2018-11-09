@@ -16,6 +16,8 @@ typedef unsigned char uchar;      //using uchar as shorthand
 port p_scl = XS1_PORT_1E;         //interface ports to orientation
 port p_sda = XS1_PORT_1F;
 
+int running; // Indicates whether the program is running
+
 on tile[0] : in port buttons = XS1_PORT_4E; //port to access xCore-200 buttons
 on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
 
@@ -112,7 +114,20 @@ void distributor(chanend c_in, chanend c_out, chanend fromController)
   printf( "\nOne processing round completed...\n" );
 }
 
-void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend dataIn, chanend dataOut){
+void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend toleds, chanend dataIn, chanend dataOut){
+    while(running == 0){
+        int buttonPress;
+        fromButtonListener :> buttonPress;
+        if(buttonPress == 14){
+            dataIn :> 1;
+
+
+
+            running = 1;
+        }
+    }
+
+
 
 }
 
@@ -234,18 +249,19 @@ i2c_master_if i2c[1];               //interface to orientation
 
 char infname[] = "test.pgm";     //put your input image path here
 char outfname[] = "testout.pgm"; //put your output image path here
-chan c_inIO, c_outIO, c_orientation, c_buttonListener, c_distributor, c_control;    //extend your channel definitions here
+chan c_inIO, c_outIO, c_orientation, c_buttonListener, c_distributor, c_leds, c_controllerIn, c_controllerOut;    //extend your channel definitions here
 
+running = 0;
 
 par {
     i2c_master(i2c, 1, p_scl, p_sda, 10);               //server thread providing orientation data
-    orientation(i2c[0], c_control);                     //client thread reading orientation data
-    buttonListener(buttons, c_control);                 //thread reading button information data
-    showLEDs(leds, c_control);                          //thread setting LEDs
-    DataInStream(infname, c_inIO, c_control);           //thread to read in a PGM image
-    DataOutStream(outfname, c_outIO, c_control);        //thread to write out a PGM image
-    distributor(c_inIO, c_outIO, c_control);            //thread to coordinate work on image
-    controller(c_distributor, c_orientation, c_buttonListener, c_inIO, c_outIO); // Controller thread.
+    orientation(i2c[0], c_orientation);                 //client thread reading orientation data
+    buttonListener(buttons, c_buttonListener);          //thread reading button information data
+    showLEDs(leds, c_leds);                             //thread setting LEDs
+    DataInStream(infname, c_inIO, c_controllerIn);           //thread to read in a PGM image
+    DataOutStream(outfname, c_outIO, c_controllerOut);        //thread to write out a PGM image
+    distributor(c_inIO, c_outIO, c_distributor);            //thread to coordinate work on image
+    controller(c_distributor, c_orientation, c_buttonListener, c_leds, c_controllerIn, c_controllerOut); // Controller thread.
   }
 
   return 0;
