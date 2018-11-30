@@ -220,10 +220,10 @@ void controlLEDs(out port p, chanend fromController) {
             toPort = 0;
             fromController <: 1;
             break;
+        }
 
         p <: toPort;
         waitMoment(50000000);
-        }
     }
 }
 
