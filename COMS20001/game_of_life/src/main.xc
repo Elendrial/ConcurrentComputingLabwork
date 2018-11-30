@@ -211,10 +211,10 @@ void controlLEDs(out port p, chanend fromController) {
 
         case 0: toPort = 0; break;
 
-        case 1: toPort = 1; break;
+        case 1: toPort = 3; break;
 
         case 2:
-            toPort = 1;
+            toPort = 3;
             p <: toPort;
             waitMoment(50000000);
             toPort = 0;
