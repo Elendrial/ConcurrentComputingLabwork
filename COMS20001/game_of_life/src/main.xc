@@ -43,7 +43,7 @@ void DataInStream(char infname[], chanend toDistributor, chanend fromController)
     uchar line[ IMWD ];
 
     fromController :> start;
-    printf( "DataInStream: Start...\n" );
+    printf("DataInStream: Start...\n");
 
     //Open PGM file
     res = _openinpgm( infname, IMWD, IMHT );
@@ -169,19 +169,28 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     }
 
     int input;
+    int paused = 0;
     while(running == 1){
         select{
             case toDistributor :> input:
+
+                // Assuming this means a round has been completed: flash once
+                toleds <: 2;
                 break;
 
             case fromAccelerometer :> input:
+                if(input == 1)
+                    paused = 1;
+                else if(input == 0)
+                    paused = 0;
+
+                else{
+                    printf("unknown message from accelerometer!");fflush(stdout);
+                }
+
                 break;
 
             case fromButtonListener :> input:
-                break;
-
-            case toleds :> input:
-                toleds <: 1;
                 break;
 
             case dataIn :> input:
@@ -209,21 +218,27 @@ void controlLEDs(out port p, chanend fromController) {
 
         switch(state){
 
-        case 0: toPort = 0; break;
+        case 0: toPort = 0; break; // Nothing
 
-        case 1: toPort = 3; break;
+        case 1: toPort = 4; break; // Separate green light
 
         case 2:
-            toPort = 3;
+            toPort = 0;
+            p <: toPort;
+            waitMoment(50000000);
+            toPort = 1;			   // Normal green light
             p <: toPort;
             waitMoment(50000000);
             toPort = 0;
-            fromController <: 1;
+            p <: toPort;
+            waitMoment(50000000);
+            toPort = 1;
             break;
+
+        case 3: toPort = 8;	break; // Red light
         }
 
         p <: toPort;
-        waitMoment(50000000);
     }
 }
 
@@ -311,11 +326,13 @@ void orientation(client interface i2c_master_if i2c, chanend toController) {
         int x = read_acceleration(i2c, FXOS8700EQ_OUT_X_MSB);
 
         //send signal to distributor after first tilt
-        if (!tilted) {
-            if (x>30) {
-                tilted = 1 - tilted;
-                toController <: 1;
-            }
+        if (tilted == 0 && x > 30) {
+            toController <: 1;
+            tilted = 1;
+        }
+        else if(tilted == 1 && x < 30){
+            toController <: 0;
+            tilted = 0;
         }
     }
 }
