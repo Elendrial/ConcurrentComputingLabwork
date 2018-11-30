@@ -38,7 +38,7 @@ on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
 // Read Image from PGM file from path infname[] to channel c_out
 //
 /////////////////////////////////////////////////////////////////////////////////////////
-void DataInStream(char infname[], chanend c_out, chanend fromController){
+void DataInStream(char infname[], chanend toDistributor, chanend fromController){
     int res, start;
     uchar line[ IMWD ];
 
@@ -47,16 +47,21 @@ void DataInStream(char infname[], chanend c_out, chanend fromController){
 
     //Open PGM file
     res = _openinpgm( infname, IMWD, IMHT );
+    printf("dataIn tried open pgm\n");fflush(stdout);
     if( res ) {
         printf( "DataInStream: Error openening %s\n.", infname );
         return;
     }
+    else{
+        printf( "DataIn: Opened pic successfully" );
+    }
 
+    printf( "DataInStream: Reading image.");fflush(stdout);
     //Read image line-by-line and send byte by byte to channel c_out
     for( int y = 0; y < IMHT; y++ ) {
         _readinline( line, IMWD );
         for( int x = 0; x < IMWD; x++ ) {
-            c_out <: line[ x ];
+            toDistributor <: line[ x ];
             printf( "-%4.1d ", line[ x ] ); //show image values
         }
         printf( "\n" );
@@ -104,13 +109,11 @@ int isAliveNextRound(int i[9]){
 // Currently the function just inverts the image
 //
 /////////////////////////////////////////////////////////////////////////////////////////
-void distributor(chanend c_in, chanend c_out, chanend fromController){
+void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController){
     uchar image[IMHT][IMWD];
 
     //Starting up and wait for tilting of the xCore-200 Explorer
     printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
-    printf( "Waiting for Board Tilt...\n" );
-    fromController :> int value;
 
     //Read in and do something with your image values..
     //This just inverts every pixel, but you should
@@ -118,7 +121,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromController){
     printf( "Waiting for image...\n" );
     for( int y = 0; y < IMHT; y++ ) {   //go through all lines
         for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-            c_in :> image[y][x];                    //read the pixel value
+            fromDataIn :> image[y][x];                    //read the pixel value
         }
     }
 
@@ -135,7 +138,7 @@ void distributor(chanend c_in, chanend c_out, chanend fromController){
 //  }
     for( int y = 0; y < IMHT; y++ ) {   //go through all lines
         for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-            c_out <: image[y][x]; //send some modified pixel out
+            toDataOut <: image[y][x]; //send some modified pixel out
         }
     }
 
@@ -151,12 +154,16 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     while(running == 0){
         int buttonPress;
         fromButtonListener :> buttonPress;
+        printf( "Controller got from button lisner\n" );
         if(buttonPress == 14){
             dataIn <: 1; // Tell dataIn to read in the data
+            printf( "Controller activated dataIn\n" );
             toleds <: 1; // Set leds to state 1 (green on)
+            printf( "Controller activated led (on)\n" );
 
             dataIn :> buttonPress; // If we hear from dataIn, we know data reading is over.
             toleds <: 2; // Set leds to state 2 (green flash)
+            printf( "Controller activated led (flash)\n" );
             running = 1; // Set running to 1.
         }
     }
@@ -253,7 +260,7 @@ void DataOutStream(char outfname[], chanend c_in, chanend fromController){
             return;
         }
 
-        //Compile each line of the image and write the image line-by-line
+        //Compile ea ch line of the image and write the image line-by-line
         for( int y = 0; y < IMHT; y++ ) {
             for( int x = 0; x < IMWD; x++ ) {
                 c_in :> line[ x ];
