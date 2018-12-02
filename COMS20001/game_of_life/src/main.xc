@@ -142,17 +142,22 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController){
         //
         //
         //  }
-            for( int y = 0; y < IMHT; y++ ) {   //go through all lines
-                for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-                    toDataOut <: image[y][x]; //send some modified pixel out
-                }
-            }
+
 
             printf( "\nOne processing round completed...\n" );
         }
+
         else if(process == 2){ // 2: export the 'image'
-            // TODO
+            for( int y = 0; y < IMHT; y++ ) {
+                for( int x = 0; x < IMWD; x++ ) {
+                    toDataOut <: image[y][x]; // Send the image to dataOut
+                }
+            }
+
+            // Tell the controller that we're done exporting.
+            toController <: 0;
         }
+
         else{ // 1 (or any undefined number): do nothing.
             waitMoment(25000000); // wait quarter of a second
         }
@@ -197,7 +202,15 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                     toDistributor <: running;
                     break;
                 case 1: // Asking whether to processs
-                    if(toExport == 0) toDistributor <: 2;
+                    if(toExport == 1){
+                        toDistributor <: 2; // Export
+                        toleds <: 4;        // Blue light
+                        toExport = 0;
+
+                        // TODO: Check that this doesn't block anything, should be fine. If there are issues, change this.
+                        toDistributor :> int; // Wait until we're done exporting
+                        toleds <: 0;          // Turn off the leds
+                    }
                     else toDistributor <: paused;
                     // If not paused, flash to indicate processing.
                     if(paused == 0) toleds <: 2;
@@ -219,7 +232,8 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                 break;
 
             case fromButtonListener :> input:
-                // TODO: export
+                if(input == 13) // 13: button sw2
+                    toExport = 1;
                 break;
 
             case dataIn :> input:
@@ -267,6 +281,7 @@ void controlLEDs(out port p, chanend fromController) {
             break;
 
         case 3: toPort = 8;	break; // Red light
+        case 4: toPort = 2; break; // Blue light
         }
 
         p <: toPort;
@@ -278,10 +293,11 @@ void controlLEDs(out port p, chanend fromController) {
 //READ BUTTONS and send button pattern to userAnt
 void buttonListener(in port b, chanend toController) {
     int r;
+    // TODO: Allow this to end gracefully.
     while (1) {
         b when pinseq(15)  :> r;    // check that no button is pressed
         b when pinsneq(15) :> r;    // check if some buttons are pressed
-        if ((r==13) || (r==14))     // if either button is pressed
+        if ((r==13) || (r==14))     // if either button is pressed - 13: SW2, 14: button SW1
             toController <: r;         // send button pattern to userAnt
     }
 }
@@ -295,6 +311,7 @@ void DataOutStream(char outfname[], chanend c_in, chanend fromController){
     int res, start;
     uchar line[ IMWD ];
 
+    // TODO: Make this note a while(1), and allow it to end down gracefully.
     while(1) {
         fromController :> start;
 
