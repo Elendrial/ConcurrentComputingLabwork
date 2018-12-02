@@ -7,3 +7,7 @@ bin
 *.xn
 *.xscope
 Makefile
+COMS20001/game_of_life/.cproject
+COMS20001/game_of_life/.project
+COMS20001/game_of_life/.settings/org.eclipse.cdt.core.prefs
+COMS20001/game_of_life/Makefile
