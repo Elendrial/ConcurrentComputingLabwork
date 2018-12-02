@@ -17,8 +17,6 @@ typedef unsigned char uchar;      //using uchar as shorthand
 port p_scl = XS1_PORT_1E;         //interface ports to orientation
 port p_sda = XS1_PORT_1F;
 
-int running; // Indicates whether the program is running
-
 on tile[0] : in port buttons = XS1_PORT_4E; //port to access xCore-200 buttons
 on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
 
@@ -125,25 +123,43 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController){
         }
     }
 
-    int lineIndex = 0;
-    // Split img
-    //  while (lineIndex < IMHT) {
-    //      lineIndex += PTHT;
-//
-//  }
-//  // process with img parts
-//  par {
-//
-//
-//  }
-    for( int y = 0; y < IMHT; y++ ) {   //go through all lines
-        for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-            toDataOut <: image[y][x]; //send some modified pixel out
-        }
-    }
+    int lineIndex;
+    int process;
+    int isRunning = 1;
+    while(isRunning == 1){
+        // Ping the controller ask what to do
+        fromController <: 1;
+        fromController :> process;
+        if(process == 0){ // 0: process normally
+            lineIndex = 0;
+            // Split img
+            //  while (lineIndex < IMHT) {
+            //      lineIndex += PTHT;
+        //
+        //  }
+        //  // process with img parts
+        //  par {
+        //
+        //
+        //  }
+            for( int y = 0; y < IMHT; y++ ) {   //go through all lines
+                for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
+                    toDataOut <: image[y][x]; //send some modified pixel out
+                }
+            }
 
-    printf( "\nOne processing round completed...\n" );
-    fromController <: 0;
+            printf( "\nOne processing round completed...\n" );
+        }
+        else if(process == 2){ // 2: export the 'image'
+            // TODO
+        }
+        else{ // 1 (or any undefined number): do nothing.
+            waitMoment(25000000); // wait quarter of a second
+        }
+
+        fromController <: 0; // Ask controller to send whether still running.
+        fromController :> isRunning;
+    }
 }
 
 
@@ -151,6 +167,8 @@ void processImgPart(chanend fromAbove, chanend fromBelow) {}
 
 
 void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend toleds, chanend dataIn, chanend dataOut){
+    int running = 0;
+
     while(running == 0){
         int buttonPress;
         fromButtonListener :> buttonPress;
@@ -169,13 +187,23 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     }
 
     int input;
-    int paused = 0;
+    int paused = 0; // 0: not paused           1: paused
+    int toExport = 0;
     while(running == 1){
         select{
             case toDistributor :> input:
+                switch(input){
+                case 0: // Asking if running
+                    toDistributor <: running;
+                    break;
+                case 1: // Asking whether to processs
+                    if(toExport == 0) toDistributor <: 2;
+                    else toDistributor <: paused;
+                    // If not paused, flash to indicate processing.
+                    if(paused == 0) toleds <: 2;
+                    break;
+                }
 
-                // Assuming this means a round has been completed: flash once
-                toleds <: 2;
                 break;
 
             case fromAccelerometer :> input:
@@ -191,12 +219,15 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                 break;
 
             case fromButtonListener :> input:
+                // TODO: export
                 break;
 
             case dataIn :> input:
+                // Shouldn't be anything, may just delete
                 break;
 
             case dataOut :> input:
+                // Shouldn't be anything, may just delete
                 break;
         }
     }
@@ -349,8 +380,6 @@ int main(void) {
     char infname[] = "test.pgm";     //put your input image path here
     char outfname[] = "testout.pgm"; //put your output image path here
     chan c_inIO, c_outIO, c_orientation, c_buttonListener, c_distributor, c_leds, c_controllerIn, c_controllerOut;    //extend your channel definitions here
-
-    running = 0;
 
     par {
         i2c_master(i2c, 1, p_scl, p_sda, 10);               //server thread providing orientation data
