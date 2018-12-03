@@ -11,7 +11,7 @@
 #define  IMHT 16                  //image height
 #define  IMWD 16                  //image width
 #define  PTHT 4                   //image part height
-#define  PTNM (IMHT%PTHT ? IMHT/PTHT+1: IMHT/PTHT)  //number of image parts
+#define  PTNM (IMHT%PTHT != 0 ? IMHT/PTHT+1 : IMHT/PTHT)  //number of image parts
 
 typedef unsigned char uchar;      //using uchar as shorthand
 
@@ -89,15 +89,15 @@ int isAliveNextRound(int i[9]){
     int middleAlive = i[4];
     int amountAlive = 0;
     for(int c = 0; c < 9; c++){
-        if(c) amountAlive++;
+        if(i[c]) amountAlive++;
     }
 
     int alive = 0;
 
     if(middleAlive && amountAlive > 1 && amountAlive < 4) alive = 1;
-    else if(!middleAlive && amountAlive > 2) alive = 1;
+    else if(!middleAlive && amountAlive == 3) alive = 1;
 
-    return 0;
+    return alive;
 
 }
 
@@ -114,15 +114,17 @@ void assignToWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM])
         for(int j = 0; j < IMWD; j ++)
             toWorker[index] <: image[(i+IMHT)%IMHT][j];
     }
+    printf("dist assigned %d!!!\n",index);fflush(stdout);
 }
 
 void receiveFromWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
     printf("dist receiving %d!!!\n",index);fflush(stdout);
-    for(int i = index*PTHT; i <= (index+1)*PTHT - 1; i ++) {
+    for(int i = index*PTHT; i < (index+1)*PTHT; i ++) {
         for(int j = 0; j < IMWD; j ++) {
-            toWorker[index] :> image[(i+IMHT)%IMHT][j];
+            toWorker[index] :> image[i][j];
         }
     }
+    printf("dist received %d!!!\n",index);fflush(stdout);
 }
 
 
@@ -210,7 +212,7 @@ void imgPartWorker(chanend fromDistributor) {
     printf("worker sending!!!\n");fflush(stdout);
     for(int i = 0; i < PTHT; i ++)
         for(int j = 0; j < IMWD; j++)
-            fromDistributor <: imgPart[i][j];
+            fromDistributor <: newImgPart[i][j];
 }
 
 
@@ -342,7 +344,7 @@ void controlLEDs(out port p, chanend fromController) {
 //READ BUTTONS and send button pattern to userAnt
 void buttonListener(in port b, chanend toController) {
     int r;
-    // TODO: Allow this to end gracefully.
+
     while (1) {
         b when pinseq(15)  :> r;    // check that no button is pressed
         b when pinsneq(15) :> r;    // check if some buttons are pressed
@@ -360,7 +362,6 @@ void DataOutStream(char outfname[], chanend c_in, chanend fromController){
     int res, start;
     uchar line[ IMWD ];
 
-    // TODO: Make this note a while(1), and allow it to end down gracefully.
     while(1) {
         fromController :> start;
 
