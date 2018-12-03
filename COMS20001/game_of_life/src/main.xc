@@ -264,7 +264,7 @@ void imgPartWorker(chanend fromDistributor) {
 
 
 
-void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend toleds, chanend dataIn, chanend dataOut){
+void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend toleds, chanend dataIn){
     int running = 0;
 
     while(running == 0){
