@@ -135,7 +135,7 @@ int isAliveNextRound(int i[9]){
 
 
 
-void assignToWorkers(int index, uchar image[PTHT+2][IMWD], chanend toWorker) {
+void assignToWorkers(int index, uchar image[PTHT+2][IMWD], uchar newimage[PTHT][IMWD], chanend toWorker) {
     printf("dist assigning %d!!!\n",index);fflush(stdout);
     for(int i = 0; i < PTHT+2; i ++) {
         for(int j = 0; j < IMWD; j ++)
@@ -145,7 +145,7 @@ void assignToWorkers(int index, uchar image[PTHT+2][IMWD], chanend toWorker) {
     printf("dist receiving %d!!!\n",index);fflush(stdout);
     for(int i = 0; i < PTHT; i ++) {
         for(int j = 0; j < IMWD; j ++) {
-            toWorker :> image[i][j];
+            toWorker :> newimage[i][j];
         }
     }
     printf("dist received %d!!!\n",index);fflush(stdout);
@@ -157,7 +157,7 @@ void receiveFromWorkers(int index, uchar image[PTHT][IMWD], chanend toWorker) {
 
 
 void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, chanend toWorker[PTNM]){
-    uchar image[IMHT][IMWD], newImage[IMHT][IMWD];
+    uchar image[IMHT][IMWD];
 
     //Starting up and wait for tilting of the xCore-200 Explorer
     printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
@@ -190,7 +190,7 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
 
             // Let workers process image parts
             par(int index = 0; index < PTNM; index ++) {
-                    assignToWorkers(index, imgPart[index], toWorker[index]);
+                    assignToWorkers(index, imgPart[index], newImgPart[index], toWorker[index]);
                     //receiveFromWorkers(index, newImgPart[index], toWorker[index]);
             }
 
