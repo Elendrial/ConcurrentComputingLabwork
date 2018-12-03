@@ -94,6 +94,8 @@ int isAliveNextRound(int i[9]){
 
     int alive = 0;
 
+    if(middleAlive) amountAlive--;
+
     if(middleAlive && amountAlive > 1 && amountAlive < 4) alive = 1;
     else if(!middleAlive && amountAlive == 3) alive = 1;
 
