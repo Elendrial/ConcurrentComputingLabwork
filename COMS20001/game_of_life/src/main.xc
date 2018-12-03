@@ -144,8 +144,7 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
 
     int lineIndex;
     int process;
-    int isRunning = 1;
-    while(isRunning == 1){
+    while(1){
         // Ping the controller ask what to do
         fromController <: 1;
         fromController :> process;
@@ -180,9 +179,6 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
         else{ // 1 (or any undefined number): do nothing.
             waitMoment(25000000); // wait quarter of a second
         }
-
-        fromController <: 0; // Ask controller to send whether still running.
-        fromController :> isRunning;
     }
 }
 
@@ -226,7 +222,9 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     while(running == 0){
         int buttonPress;
         fromButtonListener :> buttonPress;
-        printf( "Controller got from button lisner\n" );
+        printf( "Controller got from button listner\n" );
+
+        // If start button pushed...
         if(buttonPress == 14){
             dataIn <: 1; // Tell dataIn to read in the data
             printf( "Controller activated dataIn\n" );
@@ -243,13 +241,10 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     int input;
     int paused = 0; // 0: not paused           1: paused
     int toExport = 0;
-    while(running == 1){
+    while(1){
         select{
             case toDistributor :> input:
                 switch(input){
-                case 0: // Asking if running
-                    toDistributor <: running;
-                    break;
                 case 1: // Asking whether to processs
                     if(toExport == 1){
                         toDistributor <: 2; // Export
@@ -261,21 +256,25 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                         toleds <: 0;          // Turn off the leds
                     }
                     else toDistributor <: paused;
-                    // If not paused, flash to indicate processing.
-                    if(paused == 0) toleds <: 2;
+
+                    if(paused == 0) toleds <: 2; // If not paused, flash to indicate processing.
+                    else 			toleds <: 3; // If paused, show Red light
                     break;
                 }
 
                 break;
 
             case fromAccelerometer :> input:
-                if(input == 1)
-                    paused = 1;
-                else if(input == 0)
-                    paused = 0;
+                // If we hear from the accelerometer, it means we toggle the pause.
+                // However, to avoid getting out of sync, we just pass the pause value instead of a toggle.
 
-                else{
-                    printf("unknown message from accelerometer!");fflush(stdout);
+                switch(input){
+                case 0: // Set paused off
+                    paused = 0;
+                    break;
+                case 1: // Set paused on
+                    paused = 1;
+                    break;
                 }
 
                 break;
@@ -307,6 +306,7 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
 // Decodes LED pattern
 void controlLEDs(out port p, chanend fromController) {
     int state, toPort;
+
     while(1){
         fromController :> state;
 
@@ -412,8 +412,8 @@ void orientation(client interface i2c_master_if i2c, chanend toController) {
     }
 
     //Probe the orientation x-axis forever
-    while (1) {
 
+    while(1){
         //check until new orientation data is available
         do {
             status_data = i2c.read_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_DR_STATUS, result);
