@@ -109,18 +109,16 @@ int isAliveNextRound(int i[9]){
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 void assignToWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
-
+    printf("dist assigning %d!!!\n",index);fflush(stdout);
     for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
-        printf("dist assigning %d!!!\n",index);fflush(stdout);
         for(int j = 0; j < IMWD; j ++)
             toWorker[index] <: image[(i+IMHT)%IMHT][j];
     }
 }
 
 void receiveFromWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
-
+    printf("dist receiving %d!!!\n",index);fflush(stdout);
     for(int i = index*PTHT; i <= (index+1)*PTHT - 1; i ++) {
-        printf("dist receiving %d!!!\n",index);fflush(stdout);
         for(int j = 0; j < IMWD; j ++) {
             toWorker[index] :> image[(i+IMHT)%IMHT][j];
         }
@@ -159,6 +157,12 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
                     receiveFromWorkers(index, image, toWorker);
                 }
             }
+            for( int y = 0; y < IMHT; y++ ) {
+                for( int x = 0; x < IMWD; x++ ) {
+                    printf( "-%4.1d ", image[y][x] ); //show image values
+                }
+                printf( "\n" );
+            }
             printf( "\nOne processing round completed...\n" );
         }
 
@@ -186,9 +190,8 @@ void imgPartWorker(chanend fromDistributor) {
     uchar imgPart[PTHT+2][IMWD], newImgPart[PTHT][IMWD];
 
     // receive from distributor
-
+    printf("worker receiving!!!\n");fflush(stdout);
     for(int i = 0; i < PTHT+2; i ++){
-        printf("worker reveiving %d!!!\n",i);fflush(stdout);
         for(int j = 0; j < IMWD; j++)
             fromDistributor :> imgPart[i][j];
     }
