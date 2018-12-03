@@ -13,10 +13,14 @@
 #define  PTHT 4                   //image part height
 #define  PTNM (IMHT%PTHT != 0 ? IMHT/PTHT+1 : IMHT/PTHT)  //number of image parts
 
+
+    char infname[] = "test.pgm";        //put your input image path here
+    char outfname[] = "testout.pgm";    //put your output image path here
+
 typedef unsigned char uchar;      //using uchar as shorthand
 
-port p_scl = XS1_PORT_1E;         //interface ports to orientation
-port p_sda = XS1_PORT_1F;
+on tile[0] : port p_scl = XS1_PORT_1E;         //interface ports to orientation
+on tile[0] : port p_sda = XS1_PORT_1F;
 
 on tile[0] : in port buttons = XS1_PORT_4E; //port to access xCore-200 buttons
 on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
@@ -110,28 +114,50 @@ int isAliveNextRound(int i[9]){
 // Currently the function just inverts the image
 //
 /////////////////////////////////////////////////////////////////////////////////////////
-void assignToWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
+//void assignToWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
+//    printf("dist assigning %d!!!\n",index);fflush(stdout);
+//    for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
+//        for(int j = 0; j < IMWD; j ++)
+//            toWorker[index] <: image[(i+IMHT)%IMHT][j];
+//    }
+//    printf("dist assigned %d!!!\n",index);fflush(stdout);
+//}
+//
+//void receiveFromWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
+//    printf("dist receiving %d!!!\n",index);fflush(stdout);
+//    for(int i = index*PTHT; i < (index+1)*PTHT; i ++) {
+//        for(int j = 0; j < IMWD; j ++) {
+//            toWorker[index] :> image[i][j];
+//        }
+//    }
+//    printf("dist received %d!!!\n",index);fflush(stdout);
+//}
+
+
+
+void assignToWorkers(int index, uchar image[PTHT+2][IMWD], chanend toWorker) {
     printf("dist assigning %d!!!\n",index);fflush(stdout);
-    for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
+    for(int i = 0; i < PTHT+2; i ++) {
         for(int j = 0; j < IMWD; j ++)
-            toWorker[index] <: image[(i+IMHT)%IMHT][j];
+            toWorker <: image[i][j];
     }
     printf("dist assigned %d!!!\n",index);fflush(stdout);
-}
-
-void receiveFromWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
     printf("dist receiving %d!!!\n",index);fflush(stdout);
-    for(int i = index*PTHT; i < (index+1)*PTHT; i ++) {
+    for(int i = 0; i < PTHT; i ++) {
         for(int j = 0; j < IMWD; j ++) {
-            toWorker[index] :> image[i][j];
+            toWorker :> image[i][j];
         }
     }
     printf("dist received %d!!!\n",index);fflush(stdout);
 }
 
+void receiveFromWorkers(int index, uchar image[PTHT][IMWD], chanend toWorker) {
+
+}
+
 
 void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, chanend toWorker[PTNM]){
-    uchar image[IMHT][IMWD], newImage[IMHT][IMWD];;
+    uchar image[IMHT][IMWD], newImage[IMHT][IMWD];
 
     //Starting up and wait for tilting of the xCore-200 Explorer
     printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
@@ -151,20 +177,32 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
         // Ping the controller ask what to do
         fromController <: 1;
         fromController :> process;
+        uchar imgPart[PTNM][PTHT+2][IMWD], newImgPart[PTNM][PTHT][IMWD];
+
         if(process == 0){ // 0: process normally
-            // Let workers process image parts
-            par{
-                for(int index = 0; index <PTNM; index ++) {
-                    assignToWorkers(index, image, toWorker);
-                    receiveFromWorkers(index, newImage, toWorker);
+            // Spliting the image
+            for(int index = 0; index < PTNM; index ++) {
+                for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
+                    for(int j = 0; j < IMWD; j ++)
+                        imgPart[index][i][j] = image[(i+IMHT)%IMHT][j];
                 }
             }
-            for( int y = 0; y < IMHT; y++ ) {
-                for( int x = 0; x < IMWD; x++ ) {
-                    image[y][x] = newImage[y][x];
-                    printf( "-%4.1d ", image[y][x] ); //show image values
+
+            // Let workers process image parts
+            par(int index = 0; index < PTNM; index ++) {
+                    assignToWorkers(index, imgPart[index], toWorker[index]);
+                    //receiveFromWorkers(index, newImgPart[index], toWorker[index]);
+            }
+
+            // Conbine image parts
+            for(int i = 0; i < PTNM; i ++) {
+                for( int y = 0; y < IMHT; y++ ) {
+                    for( int x = 0; x < IMWD; x++ ) {
+                        image[i*PTHT + y][x] = newImgPart[i][y][x];
+//                      printf( "-%4.1d ", image[y][x] ); //show image values
+                    }
+                    printf( "\n" );
                 }
-                printf( "\n" );
             }
             printf( "\nOne processing round completed...\n" );
         }
@@ -188,39 +226,39 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
 
 void imgPartWorker(chanend fromDistributor) {
     uchar imgPart[PTHT+2][IMWD], newImgPart[PTHT][IMWD];
+    while(1) {
+        // receive from distributor
+        printf("worker receiving!!!\n");fflush(stdout);
+        for(int i = 0; i < PTHT+2; i ++){
+            for(int j = 0; j < IMWD; j++)
+                fromDistributor :> imgPart[i][j];
+        }
 
-    // receive from distributor
-    printf("worker receiving!!!\n");fflush(stdout);
-    for(int i = 0; i < PTHT+2; i ++){
-        for(int j = 0; j < IMWD; j++)
-            fromDistributor :> imgPart[i][j];
-    }
+        printf("worker processing!!!\n");fflush(stdout);
+        // process image
+        int dx[9] = {-1,0,1,-1,0,1,-1,0,1};
+        int dy[9] = {-1,-1,-1,0,0,0,1,1,1};
 
-    printf("worker processing!!!\n");fflush(stdout);
-    // process image
-    int dx[9] = {-1,0,1,-1,0,1,-1,0,1};
-    int dy[9] = {-1,-1,-1,0,0,0,1,1,1};
-
-    for(int i = 1; i <= PTHT; i ++) {
-        for(int j = 0; j < IMWD; j++){
-            int nearby[9];
-            for(int k = 0; k < 9; k ++)
-                nearby[k] = imgPart[i+dy[k]][(j+dx[k]+IMWD)%IMWD];
-            newImgPart[i-1][j] = isAliveNextRound(nearby) * 255;
+        for(int i = 1; i <= PTHT; i ++) {
+            for(int j = 0; j < IMWD; j++){
+                int nearby[9];
+                for(int k = 0; k < 9; k ++)
+                    nearby[k] = imgPart[i+dy[k]][(j+dx[k]+IMWD)%IMWD];
+                newImgPart[i-1][j] = isAliveNextRound(nearby) * 255;
 //            if(newImgPart[i-1][j]!=0)  {
 //                printf("%d %d: ", i-1, j);
 //                for(int k = 0; k < 9; k ++)
 //                    printf("%d ",nearby[k]);
 //                printf("\n");
 //            }
-        }
+                }
+            }
+        // send result to distributor
+        printf("worker sending!!!\n");fflush(stdout);
+        for(int i = 0; i < PTHT; i ++)
+            for(int j = 0; j < IMWD; j++)
+                fromDistributor <: newImgPart[i][j];
     }
-
-    // send result to distributor
-    printf("worker sending!!!\n");fflush(stdout);
-    for(int i = 0; i < PTHT; i ++)
-        for(int j = 0; j < IMWD; j++)
-            fromDistributor <: newImgPart[i][j];
 }
 
 
@@ -452,22 +490,20 @@ int main(void) {
 
     i2c_master_if i2c[1];               //interface to orientation
 
-    char infname[] = "test.pgm";        //put your input image path here
-    char outfname[] = "testout.pgm";    //put your output image path here
     chan c_inIO, c_outIO, c_orientation, c_buttonListener, c_distributor, c_leds, c_controllerIn, c_controllerOut, c_worker[PTNM];    //extend your channel definitions here
 
     par {
-        i2c_master(i2c, 1, p_scl, p_sda, 10);                   //server thread providing orientation data
-        orientation(i2c[0], c_orientation);                     //client thread reading orientation data
-        buttonListener(buttons, c_buttonListener);              //thread reading button information data
-        controlLEDs(leds, c_leds);                              //thread setting LEDs
-        DataInStream(infname, c_inIO, c_controllerIn);          //thread to read in a PGM image
-        DataOutStream(outfname, c_outIO, c_controllerOut);      //thread to write out a PGM image
-        distributor(c_inIO, c_outIO, c_distributor, c_worker);  //thread to coordinate work on image
-        for(int i = 0; i < PTNM; i ++) {                        // threads to process image
-            imgPartWorker(c_worker[i]);
+        on tile[0]: i2c_master(i2c, 1, p_scl, p_sda, 10);                   //server thread providing orientation data
+        on tile[0]: orientation(i2c[0], c_orientation);                     //client thread reading orientation data
+        on tile[0]: buttonListener(buttons, c_buttonListener);              //thread reading button information data
+        on tile[0]: controlLEDs(leds, c_leds);                              //thread setting LEDs
+        on tile[0]: DataInStream(infname, c_inIO, c_controllerIn);          //thread to read in a PGM image
+        on tile[0]: DataOutStream(outfname, c_outIO, c_controllerOut);      //thread to write out a PGM image
+        on tile[0]: distributor(c_inIO, c_outIO, c_distributor, c_worker);  //thread to coordinate work on image
+        par(int i = 0; i < PTNM; i ++) {                        // threads to process image
+            on tile[1]: imgPartWorker(c_worker[i]);
         }
-        controller(c_distributor, c_orientation, c_buttonListener, c_leds, c_controllerIn, c_controllerOut); // Controller thread.
+        on tile[0]: controller(c_distributor, c_orientation, c_buttonListener, c_leds, c_controllerIn, c_controllerOut); // Controller thread.
     }
 
     return 0;
