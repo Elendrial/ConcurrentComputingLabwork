@@ -335,10 +335,6 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
             case dataIn :> input:
                 // Shouldn't be anything, may just delete
                 break;
-
-            case dataOut :> input:
-                // Shouldn't be anything, may just delete
-                break;
         }
     }
 
@@ -404,12 +400,11 @@ void buttonListener(in port b, chanend toController) {
 // Write pixel stream from channel c_in to PGM image file
 //
 /////////////////////////////////////////////////////////////////////////////////////////
-void DataOutStream(char outfname[], chanend c_in, chanend fromController){
+void DataOutStream(char outfname[], chanend c_in){
     int res, start;
     uchar line[ IMWD ];
 
     while(1) {
-        fromController :> start;
 
         //Open PGM file
         printf( "DataOutStream: Start...\n" );
@@ -431,7 +426,6 @@ void DataOutStream(char outfname[], chanend c_in, chanend fromController){
         //Close the PGM image
         _closeoutpgm();
         printf( "DataOutStream: Done...\n" );
-        fromController <: 0;
     }
     return;
 }
@@ -490,7 +484,7 @@ int main(void) {
 
     i2c_master_if i2c[1];               //interface to orientation
 
-    chan c_inIO, c_outIO, c_orientation, c_buttonListener, c_distributor, c_leds, c_controllerIn, c_controllerOut, c_worker[PTNM];    //extend your channel definitions here
+    chan c_inIO, c_outIO, c_orientation, c_buttonListener, c_distributor, c_leds, c_controllerIn, c_worker[PTNM];    //extend your channel definitions here
 
     par {
         on tile[0]: i2c_master(i2c, 1, p_scl, p_sda, 10);                   //server thread providing orientation data
@@ -498,12 +492,12 @@ int main(void) {
         on tile[0]: buttonListener(buttons, c_buttonListener);              //thread reading button information data
         on tile[0]: controlLEDs(leds, c_leds);                              //thread setting LEDs
         on tile[0]: DataInStream(infname, c_inIO, c_controllerIn);          //thread to read in a PGM image
-        on tile[0]: DataOutStream(outfname, c_outIO, c_controllerOut);      //thread to write out a PGM image
+        on tile[0]: DataOutStream(outfname, c_outIO);      //thread to write out a PGM image
         on tile[0]: distributor(c_inIO, c_outIO, c_distributor, c_worker);  //thread to coordinate work on image
         par(int i = 0; i < PTNM; i ++) {                        // threads to process image
             on tile[1]: imgPartWorker(c_worker[i]);
         }
-        on tile[0]: controller(c_distributor, c_orientation, c_buttonListener, c_leds, c_controllerIn, c_controllerOut); // Controller thread.
+        on tile[0]: controller(c_distributor, c_orientation, c_buttonListener, c_leds, c_controllerIn); // Controller thread.
     }
 
     return 0;
