@@ -52,10 +52,10 @@ void DataInStream(char infname[], chanend toDistributor, chanend fromController)
         return;
     }
     else{
-        printf( "DataIn: Opened pic successfully" );
+        printf( "DataIn: Opened pic successfully\n" );
     }
 
-    printf( "DataInStream: Reading image.");fflush(stdout);
+    printf( "DataInStream: Reading image.\n");fflush(stdout);
     //Read image line-by-line and send byte by byte to channel c_out
     for( int y = 0; y < IMHT; y++ ) {
         _readinline( line, IMWD );
@@ -131,7 +131,7 @@ void receiveFromWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTN
 
 
 void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, chanend toWorker[PTNM]){
-    uchar image[IMHT][IMWD];
+    uchar image[IMHT][IMWD], newImage[IMHT][IMWD];;
 
     //Starting up and wait for tilting of the xCore-200 Explorer
     printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
@@ -146,7 +146,6 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
         }
     }
 
-    int lineIndex;
     int process;
     while(1){
         // Ping the controller ask what to do
@@ -157,11 +156,12 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
             par{
                 for(int index = 0; index <PTNM; index ++) {
                     assignToWorkers(index, image, toWorker);
-                    receiveFromWorkers(index, image, toWorker);
+                    receiveFromWorkers(index, newImage, toWorker);
                 }
             }
             for( int y = 0; y < IMHT; y++ ) {
                 for( int x = 0; x < IMWD; x++ ) {
+                    image[y][x] = newImage[y][x];
                     printf( "-%4.1d ", image[y][x] ); //show image values
                 }
                 printf( "\n" );
@@ -207,6 +207,12 @@ void imgPartWorker(chanend fromDistributor) {
             for(int k = 0; k < 9; k ++)
                 nearby[k] = imgPart[i+dy[k]][(j+dx[k]+IMWD)%IMWD];
             newImgPart[i-1][j] = isAliveNextRound(nearby) * 255;
+//            if(newImgPart[i-1][j]!=0)  {
+//                printf("%d %d: ", i-1, j);
+//                for(int k = 0; k < 9; k ++)
+//                    printf("%d ",nearby[k]);
+//                printf("\n");
+//            }
         }
     }
 
