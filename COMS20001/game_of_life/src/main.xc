@@ -195,7 +195,7 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
                     //receiveFromWorkers(index, newImgPart[index], toWorker[index]);
             }
 
-            // Conbine image parts
+            // Combine image parts
             for(int i = 0; i < PTNM; i ++) {
                 for( int y = 0; y < PTHT; y++ ) {
                     for( int x = 0; x < IMWD; x++ ) {
@@ -209,6 +209,7 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
         }
 
         else if(process == 2){ // 2: export the 'image'
+            toDataOut <: 0; // Give it any information to tell it we're about to export.
             for( int y = 0; y < IMHT; y++ ) {
                 for( int x = 0; x < IMWD; x++ ) {
                     toDataOut <: image[y][x]; // Send the image to dataOut
@@ -421,6 +422,7 @@ void DataOutStream(char outfname[], chanend c_in){
     uchar line[ IMWD ];
 
     while(1) {
+        c_in :> int; // Tell it to open the file ready for exporting.
 
         //Open PGM file
         printf( "DataOutStream: Start...\n" );
