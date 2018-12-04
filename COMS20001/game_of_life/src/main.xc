@@ -185,7 +185,7 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
             for(int index = 0; index < PTNM; index ++) {
                 for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
                     for(int j = 0; j < IMWD; j ++)
-                        imgPart[index][i][j] = image[(i+IMHT)%IMHT][j];
+                        imgPart[index][i - (index*PTHT - 1)][j] = image[(i+IMHT)%IMHT][j];
                 }
             }
 
@@ -197,10 +197,10 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
 
             // Conbine image parts
             for(int i = 0; i < PTNM; i ++) {
-                for( int y = 0; y < IMHT; y++ ) {
+                for( int y = 0; y < PTHT; y++ ) {
                     for( int x = 0; x < IMWD; x++ ) {
                         image[i*PTHT + y][x] = newImgPart[i][y][x];
-//                      printf( "-%4.1d ", image[y][x] ); //show image values
+                        printf( "-%4.1d ", image[i*PTHT + y][x] ); //show image values
                     }
                     printf( "\n" );
                 }
