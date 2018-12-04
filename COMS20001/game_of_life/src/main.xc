@@ -235,7 +235,7 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
             for( int y = 0; y < IMHT; y++ ) {
                 for( int x = 0; x < CIMWD; x++ ) {
                     for(int b = 7; b >= 0; b --)
-                        fromController <: (image[y][x] & (1<<b)) * 255; // Send the image to dataOut
+                        fromController <: (uchar) (image[y][x] & (1<<b)) * 255; // Send the image to dataOut
                 }
             }
 
@@ -436,10 +436,10 @@ void buttonListener(in port b, chanend toController) {
     int r;
 
     while (1) {
-        b when pinseq(15)  :> r;    // check that no button is pressed
-        b when pinsneq(15) :> r;    // check if some buttons are pressed
-        if ((r==13) || (r==14))     // if either button is pressed - 13: SW2, 14: button SW1
-            toController <: r;         // send button pattern to userAnt
+        b when pinseq(15)  :> r;    	// check that no button is pressed
+        b when pinsneq(15) :> r;    	// check if some buttons are pressed
+        if ((r==13) || (r==14))     	// if either button is pressed - 13: SW2, 14: button SW1
+            toController <: r;      	// send button pattern to controller
     }
 }
 
