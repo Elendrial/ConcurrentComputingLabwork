@@ -8,9 +8,10 @@
 #include "i2c.h"
 #include <stdbool.h>
 
-#define  IMHT 512                  //image height
-#define  IMWD 512                  //image width
+#define  IMHT 512                   //image height
+#define  IMWD 512                   //image width
 #define  PTHT 128                   //image part height
+#define  CIMWD IMWD/8               //compressed image width
 #define  PTNM (IMHT%PTHT != 0 ? IMHT/PTHT+1 : IMHT/PTHT)  //number of image parts
 
 
@@ -149,16 +150,16 @@ int isAliveNextRound(int i[9]){
 /////////////////////////////////////////////////////////////////////////////////////////
 
 
-void assignToWorkers(int index, uchar image[PTHT+2][IMWD/8], uchar newimage[PTHT][IMWD/8], chanend toWorker) {
+void assignToWorkers(int index, uchar image[PTHT+2][CIMWD], uchar newimage[PTHT][CIMWD], chanend toWorker) {
     //printf("dist assigning %d!!!\n",index);fflush(stdout);
     for(int i = 0; i < PTHT+2; i ++) {
-        for(int j = 0; j < IMWD/8; j ++)
+        for(int j = 0; j < CIMWD; j ++)
             toWorker <: image[i][j];
     }
     //printf("dist assigned %d!!!\n",index);fflush(stdout);
     //printf("dist receiving %d!!!\n",index);fflush(stdout);
     for(int i = 0; i < PTHT; i ++) {
-        for(int j = 0; j < IMWD/8; j ++) {
+        for(int j = 0; j < CIMWD; j ++) {
             toWorker :> newimage[i][j];
         }
     }
@@ -167,11 +168,11 @@ void assignToWorkers(int index, uchar image[PTHT+2][IMWD/8], uchar newimage[PTHT
 
 
 void distributor(chanend fromController, chanend toWorker[PTNM]){
-    uchar image[IMHT][IMWD/8], c;
+    uchar image[IMHT][CIMWD], c;
 
     // init
     for( int y = 0; y < IMHT; y++ ) {   //go through all lines
-        for( int x = 0; x < IMWD/8; x++ ) { //go through each pixel per line
+        for( int x = 0; x < CIMWD; x++ ) { //go through each pixel per line
             image[y][x] = 0;
         }
     }
@@ -199,13 +200,13 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
         // Ping the controller ask what to do
         fromController <: 1;
         fromController :> process;
-        uchar imgPart[PTNM][PTHT+2][IMWD/8], newImgPart[PTNM][PTHT][IMWD/8];
+        uchar imgPart[PTNM][PTHT+2][CIMWD], newImgPart[PTNM][PTHT][CIMWD];
 
         if(process == 0){ // 0: process normally
             // Spliting the image
             for(int index = 0; index < PTNM; index ++) {
                 for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
-                    for(int j = 0; j < IMWD/8; j ++)
+                    for(int j = 0; j < CIMWD; j ++)
                         imgPart[index][i - (index*PTHT - 1)][j] = image[(i+IMHT)%IMHT][j];
                 }
             }
@@ -219,7 +220,7 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
             // Combine image parts
             for(int i = 0; i < PTNM; i ++) {
                 for( int y = 0; y < PTHT; y++ ) {
-                    for( int x = 0; x < IMWD/8; x++ ) {
+                    for( int x = 0; x < CIMWD; x++ ) {
                         image[i*PTHT + y][x] = newImgPart[i][y][x];
                         //printf( "-%4.1d ", image[i*PTHT + y][x] ); //show image values
                     }
@@ -232,7 +233,7 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
         else if(process == 2){ // 2: export the 'image'
             fromController <: 0; // Give it any information to tell it we're about to export.
             for( int y = 0; y < IMHT; y++ ) {
-                for( int x = 0; x < IMWD/8; x++ ) {
+                for( int x = 0; x < CIMWD; x++ ) {
                     for(int b = 7; b >= 0; b --)
                         fromController <: (image[y][x] & (1<<b)) * 255; // Send the image to dataOut
                 }
@@ -246,7 +247,7 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
             if(pausePrint == 0){
                 int alive = 0;
                 for( int y = 0; y < IMHT; y++ ) {
-                    for( int x = 0; x < IMWD/8; x++ ) {
+                    for( int x = 0; x < CIMWD; x++ ) {
                         if(image[y][x]) alive++;
                     }
                 }
@@ -259,38 +260,53 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
 }
 
 void imgPartWorker(chanend fromDistributor) {
-    uchar imgPart[PTHT+2][IMWD/8], newImgPart[PTHT][IMWD/8];
+    uchar imgPart[PTHT+2][CIMWD], newImgPart[PTHT][CIMWD];
     while(1) {
         // receive from distributor
         //printf("worker receiving!!!\n");fflush(stdout);
         for(int i = 0; i < PTHT+2; i ++){
-            for(int j = 0; j < IMWD/8; j++)
+            for(int j = 0; j < CIMWD; j++)
                 fromDistributor :> imgPart[i][j];
         }
 
         //printf("worker processing!!!\n");fflush(stdout);
         // process image
-        int dx[9] = {-1,0,1,-1,0,1,-1,0,1};
-        int dy[9] = {-1,-1,-1,0,0,0,1,1,1};
-
+        int nearby[9];
         for(int i = 1; i <= PTHT; i ++) {
-            for(int j = 0; j < IMWD; j++){
-                int nearby[9];
-                for(int k = 0; k < 9; k ++)
-                    nearby[k] = imgPart[i+dy[k]][(j+dx[k]+IMWD)%IMWD];
-                newImgPart[i-1][j] = isAliveNextRound(nearby) * 255;
-//            if(newImgPart[i-1][j]!=0)  {
-//                //printf("%d %d: ", i-1, j);
-//                for(int k = 0; k < 9; k ++)
-//                    //printf("%d ",nearby[k]);
-//                //printf("\n");
-//            }
+            for(int j = 0; j < CIMWD; j++){
+                for(int b = 7; b >= 0; b --) {
+                    if(b == 7){
+                        for(int ni = 0; ni < 3; ni ++) {
+                            nearby[ni*3] = imgPart[i+ni-1][(j+CIMWD-1)%CIMWD] & 1;
+                            for(int nj = 1; nj < 3; nj ++) {
+                                nearby[ni*3+nj] = imgPart[i+ni-1][j] & (1<<(b+1-nj));
+                            }
+                        }
+                    }
+                    else if(b == 0){
+                        for(int ni = 0; ni < 3; ni ++) {
+                            nearby[ni*3] = imgPart[i+ni-1][(j+CIMWD-1)%CIMWD] & 1;
+                            for(int nj = 0; nj < 2; nj ++) {
+                                nearby[ni*3+nj] = imgPart[i+ni-1][j] & (1<<(b+1-nj));
+                            }
+                        }
+                    }
+                    else {
+                        for(int ni = 0; ni < 3; ni ++) {
+                            for(int nj = 0; nj < 3; nj ++) {
+                                nearby[ni*3+nj] = imgPart[i+ni-1][j] & (1<<(b+1-nj));
+                            }
+                        }
+                    }
+                    newImgPart[i-1][j] = isAliveNextRound(nearby) * 255;
                 }
             }
+        }
+
         // send result to distributor
         //printf("worker sending!!!\n");fflush(stdout);
         for(int i = 0; i < PTHT; i ++)
-            for(int j = 0; j < IMWD; j++)
+            for(int j = 0; j < CIMWD; j++)
                 fromDistributor <: newImgPart[i][j];
     }
 }
