@@ -8,9 +8,9 @@
 #include "i2c.h"
 #include <stdbool.h>
 
-#define  IMHT 16                  //image height
-#define  IMWD 16                  //image width
-#define  PTHT 4                   //image part height
+#define  IMHT 512                  //image height
+#define  IMWD 512                  //image width
+#define  PTHT 128                   //image part height
 #define  PTNM (IMHT%PTHT != 0 ? IMHT/PTHT+1 : IMHT/PTHT)  //number of image parts
 
 
@@ -46,34 +46,34 @@ void DataInStream(char infname[], chanend toDistributor, chanend fromController)
     uchar line[ IMWD ];
 
     fromController :> start;
-    printf("DataInStream: Start...\n");
+    //printf("DataInStream: Start...\n");
 
     //Open PGM file
     res = _openinpgm( infname, IMWD, IMHT );
-    printf("dataIn tried open pgm\n");fflush(stdout);
+    //printf("dataIn tried open pgm\n");fflush(stdout);
     if( res ) {
-        printf( "DataInStream: Error openening %s\n.", infname );
+        //printf( "DataInStream: Error openening %s\n.", infname );
         return;
     }
     else{
-        printf( "DataIn: Opened pic successfully\n" );
+        //printf( "DataIn: Opened pic successfully\n" );
     }
 
-    printf( "DataInStream: Reading image.\n");fflush(stdout);
+    //printf( "DataInStream: Reading image.\n");fflush(stdout);
     //Read image line-by-line and send byte by byte to channel c_out
     for( int y = 0; y < IMHT; y++ ) {
         _readinline( line, IMWD );
         for( int x = 0; x < IMWD; x++ ) {
             toDistributor <: line[ x ];
-            printf( "-%4.1d ", line[ x ] ); //show image values
+            //printf( "-%4.1d ", line[ x ] ); //show image values
         }
-        printf( "\n" );
+        //printf( "\n" );
     }
 
     //Close PGM image file
     _closeinpgm();
 
-    printf( "DataInStream: Done...\n" );
+    //printf( "DataInStream: Done...\n" );
     fromController <: 0;
     return;
 }
@@ -115,40 +115,40 @@ int isAliveNextRound(int i[9]){
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 //void assignToWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
-//    printf("dist assigning %d!!!\n",index);fflush(stdout);
+//    //printf("dist assigning %d!!!\n",index);fflush(stdout);
 //    for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
 //        for(int j = 0; j < IMWD; j ++)
 //            toWorker[index] <: image[(i+IMHT)%IMHT][j];
 //    }
-//    printf("dist assigned %d!!!\n",index);fflush(stdout);
+//    //printf("dist assigned %d!!!\n",index);fflush(stdout);
 //}
 //
 //void receiveFromWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
-//    printf("dist receiving %d!!!\n",index);fflush(stdout);
+//    //printf("dist receiving %d!!!\n",index);fflush(stdout);
 //    for(int i = index*PTHT; i < (index+1)*PTHT; i ++) {
 //        for(int j = 0; j < IMWD; j ++) {
 //            toWorker[index] :> image[i][j];
 //        }
 //    }
-//    printf("dist received %d!!!\n",index);fflush(stdout);
+//    //printf("dist received %d!!!\n",index);fflush(stdout);
 //}
 
 
 
 void assignToWorkers(int index, uchar image[PTHT+2][IMWD], uchar newimage[PTHT][IMWD], chanend toWorker) {
-    printf("dist assigning %d!!!\n",index);fflush(stdout);
+    //printf("dist assigning %d!!!\n",index);fflush(stdout);
     for(int i = 0; i < PTHT+2; i ++) {
         for(int j = 0; j < IMWD; j ++)
             toWorker <: image[i][j];
     }
-    printf("dist assigned %d!!!\n",index);fflush(stdout);
-    printf("dist receiving %d!!!\n",index);fflush(stdout);
+    //printf("dist assigned %d!!!\n",index);fflush(stdout);
+    //printf("dist receiving %d!!!\n",index);fflush(stdout);
     for(int i = 0; i < PTHT; i ++) {
         for(int j = 0; j < IMWD; j ++) {
             toWorker :> newimage[i][j];
         }
     }
-    printf("dist received %d!!!\n",index);fflush(stdout);
+    //printf("dist received %d!!!\n",index);fflush(stdout);
 }
 
 void receiveFromWorkers(int index, uchar image[PTHT][IMWD], chanend toWorker) {
@@ -157,18 +157,29 @@ void receiveFromWorkers(int index, uchar image[PTHT][IMWD], chanend toWorker) {
 
 
 void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, chanend toWorker[PTNM]){
-    uchar image[IMHT][IMWD];
+    uchar image[IMHT][IMWD/8], c;
+
+    // init
+    for( int y = 0; y < IMHT; y++ ) {   //go through all lines
+        for( int x = 0; x < IMWD/8; x++ ) { //go through each pixel per line
+            image[y][x] = 0;
+        }
+    }
+
 
     //Starting up and wait for tilting of the xCore-200 Explorer
-    printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
+    //printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
 
     //Read in and do something with your image values..
     //This just inverts every pixel, but you should
     //change the image according to the "Game of Life"
-    printf( "Waiting for image...\n" );
+    //printf( "Waiting for image...\n" );
     for( int y = 0; y < IMHT; y++ ) {   //go through all lines
         for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-            fromDataIn :> image[y][x];                    //read the pixel value
+            fromDataIn :> c;    //read the pixel value
+            if(c == 255)
+                image[y][x/8] ++;
+            image[y][x/8] <<= 1;
         }
     }
 
@@ -178,13 +189,13 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
         // Ping the controller ask what to do
         fromController <: 1;
         fromController :> process;
-        uchar imgPart[PTNM][PTHT+2][IMWD], newImgPart[PTNM][PTHT][IMWD];
+        uchar imgPart[PTNM][PTHT+2][IMWD/8], newImgPart[PTNM][PTHT][IMWD/8];
 
         if(process == 0){ // 0: process normally
             // Spliting the image
             for(int index = 0; index < PTNM; index ++) {
                 for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
-                    for(int j = 0; j < IMWD; j ++)
+                    for(int j = 0; j < IMWD/8; j ++)
                         imgPart[index][i - (index*PTHT - 1)][j] = image[(i+IMHT)%IMHT][j];
                 }
             }
@@ -198,11 +209,11 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
             // Combine image parts
             for(int i = 0; i < PTNM; i ++) {
                 for( int y = 0; y < PTHT; y++ ) {
-                    for( int x = 0; x < IMWD; x++ ) {
+                    for( int x = 0; x < IMWD/8; x++ ) {
                         image[i*PTHT + y][x] = newImgPart[i][y][x];
-                        printf( "-%4.1d ", image[i*PTHT + y][x] ); //show image values
+                        //printf( "-%4.1d ", image[i*PTHT + y][x] ); //show image values
                     }
-                    printf( "\n" );
+                    //printf( "\n" );
                 }
             }
             printf( "\nOne processing round completed...\n" );
@@ -211,8 +222,9 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
         else if(process == 2){ // 2: export the 'image'
             toDataOut <: 0; // Give it any information to tell it we're about to export.
             for( int y = 0; y < IMHT; y++ ) {
-                for( int x = 0; x < IMWD; x++ ) {
-                    toDataOut <: image[y][x]; // Send the image to dataOut
+                for( int x = 0; x < IMWD/8; x++ ) {
+                    for(int b = 7; b >= 0; b --)
+                        toDataOut <: (image[y][x] & (1<<b)) * 255; // Send the image to dataOut
                 }
             }
 
@@ -224,7 +236,7 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
             if(pausePrint == 0){
                 int alive = 0;
                 for( int y = 0; y < IMHT; y++ ) {
-                    for( int x = 0; x < IMWD; x++ ) {
+                    for( int x = 0; x < IMWD/8; x++ ) {
                         if(image[y][x]) alive++;
                     }
                 }
@@ -240,13 +252,13 @@ void imgPartWorker(chanend fromDistributor) {
     uchar imgPart[PTHT+2][IMWD], newImgPart[PTHT][IMWD];
     while(1) {
         // receive from distributor
-        printf("worker receiving!!!\n");fflush(stdout);
+        //printf("worker receiving!!!\n");fflush(stdout);
         for(int i = 0; i < PTHT+2; i ++){
             for(int j = 0; j < IMWD; j++)
                 fromDistributor :> imgPart[i][j];
         }
 
-        printf("worker processing!!!\n");fflush(stdout);
+        //printf("worker processing!!!\n");fflush(stdout);
         // process image
         int dx[9] = {-1,0,1,-1,0,1,-1,0,1};
         int dy[9] = {-1,-1,-1,0,0,0,1,1,1};
@@ -258,15 +270,15 @@ void imgPartWorker(chanend fromDistributor) {
                     nearby[k] = imgPart[i+dy[k]][(j+dx[k]+IMWD)%IMWD];
                 newImgPart[i-1][j] = isAliveNextRound(nearby) * 255;
 //            if(newImgPart[i-1][j]!=0)  {
-//                printf("%d %d: ", i-1, j);
+//                //printf("%d %d: ", i-1, j);
 //                for(int k = 0; k < 9; k ++)
-//                    printf("%d ",nearby[k]);
-//                printf("\n");
+//                    //printf("%d ",nearby[k]);
+//                //printf("\n");
 //            }
                 }
             }
         // send result to distributor
-        printf("worker sending!!!\n");fflush(stdout);
+        //printf("worker sending!!!\n");fflush(stdout);
         for(int i = 0; i < PTHT; i ++)
             for(int j = 0; j < IMWD; j++)
                 fromDistributor <: newImgPart[i][j];
@@ -282,18 +294,18 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     while(running == 0){
         int buttonPress;
         fromButtonListener :> buttonPress;
-        printf( "Controller got from button listner\n" );
+        //printf( "Controller got from button listner\n" );
 
         // If start button pushed...
         if(buttonPress == 14){
             dataIn <: 1; // Tell dataIn to read in the data
-            printf( "Controller activated dataIn\n" );
+            //printf( "Controller activated dataIn\n" );
             toleds <: 1; // Set leds to state 1 (green on)
-            printf( "Controller activated led (on)\n" );
+            //printf( "Controller activated led (on)\n" );
 
             dataIn :> buttonPress; // If we hear from dataIn, we know data reading is over.
             toleds <: 2; // Set leds to state 2 (green flash)
-            printf( "Controller activated led (flash)\n" );
+            //printf( "Controller activated led (flash)\n" );
             running = 1; // Set running to 1.
         }
     }
@@ -425,10 +437,10 @@ void DataOutStream(char outfname[], chanend c_in){
         c_in :> int; // Tell it to open the file ready for exporting.
 
         //Open PGM file
-        printf( "DataOutStream: Start...\n" );
+        //printf( "DataOutStream: Start...\n" );
         res = _openoutpgm( outfname, IMWD, IMHT );
         if( res ) {
-            printf( "DataOutStream: Error opening %s\n.", outfname );
+            //printf( "DataOutStream: Error opening %s\n.", outfname );
             return;
         }
 
@@ -438,12 +450,12 @@ void DataOutStream(char outfname[], chanend c_in){
                 c_in :> line[ x ];
             }
             _writeoutline( line, IMWD );
-            printf( "DataOutStream: Line written...\n" );
+            //printf( "DataOutStream: Line written...\n" );
         }
 
         //Close the PGM image
         _closeoutpgm();
-        printf( "DataOutStream: Done...\n" );
+        //printf( "DataOutStream: Done...\n" );
     }
     return;
 }
@@ -461,13 +473,13 @@ void orientation(client interface i2c_master_if i2c, chanend toController) {
     // Configure FXOS8700EQ
     result = i2c.write_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_XYZ_DATA_CFG_REG, 0x01);
     if (result != I2C_REGOP_SUCCESS) {
-        printf("I2C write reg failed\n");
+        //printf("I2C write reg failed\n");
     }
   
     // Enable FXOS8700EQ
     result = i2c.write_reg(FXOS8700EQ_I2C_ADDR, FXOS8700EQ_CTRL_REG_1, 0x01);
     if (result != I2C_REGOP_SUCCESS) {
-        printf("I2C write reg failed\n");
+        //printf("I2C write reg failed\n");
     }
 
     //Probe the orientation x-axis forever
