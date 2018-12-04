@@ -50,12 +50,10 @@ void waitMoment(int tenNano) {
 // Read Image from PGM file from path infname[] to channel c_out
 //
 /////////////////////////////////////////////////////////////////////////////////////////
-void DataInStream(char infname[], chanend toDistributor, chanend fromController){
-    int res, start;
+void dataInStream(char infname[], chanend toDistributor){
+    int res;
     uchar line[ IMWD ];
-
-    fromController :> start;
-    //printf("DataInStream: Start...\n");
+    printf("DataInStream: Start...\n");
 
     //Open PGM file
     res = _openinpgm( infname, IMWD, IMHT );
@@ -82,8 +80,43 @@ void DataInStream(char infname[], chanend toDistributor, chanend fromController)
     //Close PGM image file
     _closeinpgm();
 
-    //printf( "DataInStream: Done...\n" );
-    fromController <: 0;
+    printf( "DataInStream: Done...\n" );
+    return;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+//
+// Write pixel stream from channel c_in to PGM image file
+//
+/////////////////////////////////////////////////////////////////////////////////////////
+void dataOutStream(char outfname[], chanend c_in){
+    int res;
+    uchar line[ IMWD ];
+
+    while(1) {
+        c_in :> int; // Tell it to open the file ready for exporting.
+
+        //Open PGM file
+        //printf( "DataOutStream: Start...\n" );
+        res = _openoutpgm( outfname, IMWD, IMHT );
+        if( res ) {
+            //printf( "DataOutStream: Error opening %s\n.", outfname );
+            return;
+        }
+
+        //Compile ea ch line of the image and write the image line-by-line
+        for( int y = 0; y < IMHT; y++ ) {
+            for( int x = 0; x < IMWD; x++ ) {
+                c_in :> line[ x ];
+            }
+            _writeoutline( line, IMWD );
+            //printf( "DataOutStream: Line written...\n" );
+        }
+
+        //Close the PGM image
+        _closeoutpgm();
+        //printf( "DataOutStream: Done...\n" );
+    }
     return;
 }
 
@@ -156,7 +189,7 @@ void receiveFromWorkers(int index, uchar image[PTHT][IMWD], chanend toWorker) {
 }
 
 
-void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, chanend toWorker[PTNM]){
+void distributor(chanend fromController, chanend toWorker[PTNM]){
     uchar image[IMHT][IMWD/8], c;
 
     // init
@@ -176,7 +209,7 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
     //printf( "Waiting for image...\n" );
     for( int y = 0; y < IMHT; y++ ) {   //go through all lines
         for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-            fromDataIn :> c;    //read the pixel value
+            fromController :> c;    //read the pixel value
             if(c == 255)
                 image[y][x/8] ++;
             image[y][x/8] <<= 1;
@@ -220,11 +253,11 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
         }
 
         else if(process == 2){ // 2: export the 'image'
-            toDataOut <: 0; // Give it any information to tell it we're about to export.
+            fromController <: 0; // Give it any information to tell it we're about to export.
             for( int y = 0; y < IMHT; y++ ) {
                 for( int x = 0; x < IMWD/8; x++ ) {
                     for(int b = 7; b >= 0; b --)
-                        toDataOut <: (image[y][x] & (1<<b)) * 255; // Send the image to dataOut
+                        fromController <: (image[y][x] & (1<<b)) * 255; // Send the image to dataOut
                 }
             }
 
@@ -298,14 +331,8 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
 
         // If start button pushed...
         if(buttonPress == 14){
-            dataIn <: 1; // Tell dataIn to read in the data
-            //printf( "Controller activated dataIn\n" );
             toleds <: 1; // Set leds to state 1 (green on)
-            //printf( "Controller activated led (on)\n" );
-
-            dataIn :> buttonPress; // If we hear from dataIn, we know data reading is over.
-            toleds <: 2; // Set leds to state 2 (green flash)
-            //printf( "Controller activated led (flash)\n" );
+            dataInStream(infname, toDistributor);
             running = 1; // Set running to 1.
         }
     }
@@ -322,10 +349,9 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                     if(toExport == 1){
                         toDistributor <: 2; // Export
                         toleds <: 4;        // Blue light
-                        toExport = 0;
 
-                        // TODO: Check that this doesn't block anything, should be fine. If there are issues, change this.
-                        toDistributor :> int; // Wait until we're done exporting
+                        dataOutStream(outfname, toDistributor);
+                        toExport = 0;
                         toleds <: 0;          // Turn off the leds
                     }
                     else{
@@ -426,42 +452,6 @@ void buttonListener(in port b, chanend toController) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //
-// Write pixel stream from channel c_in to PGM image file
-//
-/////////////////////////////////////////////////////////////////////////////////////////
-void DataOutStream(char outfname[], chanend c_in){
-    int res;
-    uchar line[ IMWD ];
-
-    while(1) {
-        c_in :> int; // Tell it to open the file ready for exporting.
-
-        //Open PGM file
-        //printf( "DataOutStream: Start...\n" );
-        res = _openoutpgm( outfname, IMWD, IMHT );
-        if( res ) {
-            //printf( "DataOutStream: Error opening %s\n.", outfname );
-            return;
-        }
-
-        //Compile ea ch line of the image and write the image line-by-line
-        for( int y = 0; y < IMHT; y++ ) {
-            for( int x = 0; x < IMWD; x++ ) {
-                c_in :> line[ x ];
-            }
-            _writeoutline( line, IMWD );
-            //printf( "DataOutStream: Line written...\n" );
-        }
-
-        //Close the PGM image
-        _closeoutpgm();
-        //printf( "DataOutStream: Done...\n" );
-    }
-    return;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-//
 // Initialise and  read orientation, send first tilt event to channel
 //
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -514,16 +504,14 @@ int main(void) {
 
     i2c_master_if i2c[1];               //interface to orientation
 
-    chan c_inIO, c_outIO, c_orientation, c_buttonListener, c_distributor, c_leds, c_controllerIn, c_worker[PTNM];    //extend your channel definitions here
+    chan c_orientation, c_buttonListener, c_distributor, c_leds, c_controllerIn, c_worker[PTNM];    //extend your channel definitions here
 
     par {
         on tile[0]: i2c_master(i2c, 1, p_scl, p_sda, 10);                   //server thread providing orientation data
         on tile[0]: orientation(i2c[0], c_orientation);                     //client thread reading orientation data
         on tile[0]: buttonListener(buttons, c_buttonListener);              //thread reading button information data
         on tile[0]: controlLEDs(leds, c_leds);                              //thread setting LEDs
-        on tile[1]: DataInStream(infname, c_inIO, c_controllerIn);          //thread to read in a PGM image
-        on tile[1]: DataOutStream(outfname, c_outIO);      //thread to write out a PGM image
-        on tile[0]: distributor(c_inIO, c_outIO, c_distributor, c_worker);  //thread to coordinate work on image
+        on tile[0]: distributor(c_distributor, c_worker);  //thread to coordinate work on image
         par(int i = 0; i < PTNM; i ++) {                        // threads to process image
             on tile[1]: imgPartWorker(c_worker[i]);
         }
