@@ -36,6 +36,15 @@ on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
 #define FXOS8700EQ_OUT_Z_MSB 0x5
 #define FXOS8700EQ_OUT_Z_LSB 0x6
 
+//WAIT function
+void waitMoment(int tenNano) {
+    timer tmr;
+    int waitTime;
+    tmr :> waitTime;                       //read current timer value
+    waitTime += tenNano;                  //set waitTime to 0.4s after value
+    tmr when timerafter(waitTime) :> void; //wait until waitTime is reached
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 //
 // Read Image from PGM file from path infname[] to channel c_out
@@ -76,15 +85,6 @@ void DataInStream(char infname[], chanend toDistributor, chanend fromController)
     //printf( "DataInStream: Done...\n" );
     fromController <: 0;
     return;
-}
-
-//WAIT function
-void waitMoment(int tenNano) {
-    timer tmr;
-    int waitTime;
-    tmr :> waitTime;                       //read current timer value
-    waitTime += tenNano;                  //set waitTime to 0.4s after value
-    tmr when timerafter(waitTime) :> void; //wait until waitTime is reached
 }
 
 /////// The Rules of Game of Life
