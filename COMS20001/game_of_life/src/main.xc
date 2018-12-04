@@ -173,6 +173,7 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
     }
 
     int process;
+    int pausePrint = 0;
     while(1){
         // Ping the controller ask what to do
         fromController <: 1;
@@ -218,7 +219,17 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
             fromController <: 0;
         }
 
-        else{ // 1 (or any undefined number): do nothing.
+        else{ // 1 (or any undefined number): Print current image diagnostics and wait.
+            if(pausePrint == 0){
+                int alive = 0;
+                for( int y = 0; y < IMHT; y++ ) {
+                    for( int x = 0; x < IMWD; x++ ) {
+                        if(image[y][x]) alive++;
+                    }
+                }
+
+                printf("Alive cells: %d\n", alive); // TODO: Add timer
+            }
             waitMoment(25000000); // wait quarter of a second
         }
     }
@@ -289,6 +300,7 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     int input;
     int paused = 0; // 0: not paused           1: paused
     int toExport = 0;
+    int rounds = 0;
     while(1){
         select{
             case toDistributor :> input:
@@ -303,7 +315,10 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                         toDistributor :> int; // Wait until we're done exporting
                         toleds <: 0;          // Turn off the leds
                     }
-                    else toDistributor <: paused;
+                    else{
+                        toDistributor <: paused;
+                        if(paused == 0) rounds ++;
+                    }
 
                     if(paused == 0) toleds <: 2; // If not paused, flash to indicate processing.
                     else 			toleds <: 3; // If paused, show Red light
@@ -322,6 +337,7 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                     break;
                 case 1: // Set paused on
                     paused = 1;
+                    printf("Pausing... processed %d rounds so far.\n", rounds);fflush(stdout);
                     break;
                 }
 
@@ -401,7 +417,7 @@ void buttonListener(in port b, chanend toController) {
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 void DataOutStream(char outfname[], chanend c_in){
-    int res, start;
+    int res;
     uchar line[ IMWD ];
 
     while(1) {
@@ -491,8 +507,8 @@ int main(void) {
         on tile[0]: orientation(i2c[0], c_orientation);                     //client thread reading orientation data
         on tile[0]: buttonListener(buttons, c_buttonListener);              //thread reading button information data
         on tile[0]: controlLEDs(leds, c_leds);                              //thread setting LEDs
-        on tile[0]: DataInStream(infname, c_inIO, c_controllerIn);          //thread to read in a PGM image
-        on tile[0]: DataOutStream(outfname, c_outIO);      //thread to write out a PGM image
+        on tile[1]: DataInStream(infname, c_inIO, c_controllerIn);          //thread to read in a PGM image
+        on tile[1]: DataOutStream(outfname, c_outIO);      //thread to write out a PGM image
         on tile[0]: distributor(c_inIO, c_outIO, c_distributor, c_worker);  //thread to coordinate work on image
         par(int i = 0; i < PTNM; i ++) {                        // threads to process image
             on tile[1]: imgPartWorker(c_worker[i]);
