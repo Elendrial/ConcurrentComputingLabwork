@@ -214,6 +214,17 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
                 }
             }
 
+//            for(int index = 0; index < PTNM; index ++)
+//                for( int y = 0; y < PTHT+2; y ++) {   //go through all lines
+//                       for( int x = 0; x < CIMWD; x++ ) {
+//                           printf("%d ",imgPart[index][y][x]);
+//                       }
+//                       printf("\n");
+//                }
+//                printf("\nchunck\n");
+//            }
+
+
             // Let workers process image parts
             par(int index = 0; index < PTNM; index ++) {
                     assignToWorkers(index, imgPart[index], newImgPart[index], toWorker[index]);
@@ -308,7 +319,8 @@ void imgPartWorker(chanend fromDistributor) {
                             }
                         }
                     }
-                    newImgPart[i-1][j] = isAliveNextRound(nearby) * 255;
+                    newImgPart[i-1][j] += isAliveNextRound(nearby);
+                    newImgPart[i-1][j] <<= 1;
                 }
             }
         }
