@@ -114,45 +114,22 @@ int isAliveNextRound(int i[9]){
 // Currently the function just inverts the image
 //
 /////////////////////////////////////////////////////////////////////////////////////////
-//void assignToWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
-//    //printf("dist assigning %d!!!\n",index);fflush(stdout);
-//    for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
-//        for(int j = 0; j < IMWD; j ++)
-//            toWorker[index] <: image[(i+IMHT)%IMHT][j];
-//    }
-//    //printf("dist assigned %d!!!\n",index);fflush(stdout);
-//}
-//
-//void receiveFromWorkers(int index, uchar image[IMHT][IMWD], chanend toWorker[PTNM]) {
-//    //printf("dist receiving %d!!!\n",index);fflush(stdout);
-//    for(int i = index*PTHT; i < (index+1)*PTHT; i ++) {
-//        for(int j = 0; j < IMWD; j ++) {
-//            toWorker[index] :> image[i][j];
-//        }
-//    }
-//    //printf("dist received %d!!!\n",index);fflush(stdout);
-//}
 
 
-
-void assignToWorkers(int index, uchar image[PTHT+2][IMWD], uchar newimage[PTHT][IMWD], chanend toWorker) {
+void assignToWorkers(int index, uchar image[PTHT+2][IMWD/8], uchar newimage[PTHT][IMWD/8], chanend toWorker) {
     //printf("dist assigning %d!!!\n",index);fflush(stdout);
     for(int i = 0; i < PTHT+2; i ++) {
-        for(int j = 0; j < IMWD; j ++)
+        for(int j = 0; j < IMWD/8; j ++)
             toWorker <: image[i][j];
     }
     //printf("dist assigned %d!!!\n",index);fflush(stdout);
     //printf("dist receiving %d!!!\n",index);fflush(stdout);
     for(int i = 0; i < PTHT; i ++) {
-        for(int j = 0; j < IMWD; j ++) {
+        for(int j = 0; j < IMWD/8; j ++) {
             toWorker :> newimage[i][j];
         }
     }
     //printf("dist received %d!!!\n",index);fflush(stdout);
-}
-
-void receiveFromWorkers(int index, uchar image[PTHT][IMWD], chanend toWorker) {
-
 }
 
 
@@ -249,12 +226,12 @@ void distributor(chanend fromDataIn, chanend toDataOut, chanend fromController, 
 }
 
 void imgPartWorker(chanend fromDistributor) {
-    uchar imgPart[PTHT+2][IMWD], newImgPart[PTHT][IMWD];
+    uchar imgPart[PTHT+2][IMWD/8], newImgPart[PTHT][IMWD/8];
     while(1) {
         // receive from distributor
         //printf("worker receiving!!!\n");fflush(stdout);
         for(int i = 0; i < PTHT+2; i ++){
-            for(int j = 0; j < IMWD; j++)
+            for(int j = 0; j < IMWD/8; j++)
                 fromDistributor :> imgPart[i][j];
         }
 
