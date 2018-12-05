@@ -316,7 +316,13 @@ void imgPartWorker(chanend fromDistributor) {
                     // At the left-most bit of each compressed col pack
                     if(b == 7){
                         for(int ni = 0; ni < 3; ni ++) {
-                            nearby[ni*3] = imgPart[i+ni-1][(j+CIMWD-1)%CIMWD] & 1;
+//                            if(i == 10 && j == 0) {
+//                                printf("* %d %d: %d %d \n",(j+CIMWD-1)%CIMWD, (0+2-1)%2, j, CIMWD);
+//                            }
+                            if(j == 0)
+                                nearby[ni*3] = imgPart[i+ni-1][CIMWD-1] & 1;
+                            else
+                                nearby[ni*3] = imgPart[i+ni-1][j-1] & 1;
                             for(int nj = 1; nj < 3; nj ++) {
                                 nearby[ni*3+nj] = imgPart[i+ni-1][j]>>(b+1-nj) & 1;
                             }
@@ -325,7 +331,10 @@ void imgPartWorker(chanend fromDistributor) {
                     // At the right-most bit of each compressed col pack
                     else if(b == 0){
                         for(int ni = 0; ni < 3; ni ++) {
-                            nearby[ni*3+2] = imgPart[i+ni-1][(j+CIMWD+1)%CIMWD]>> 7 & 1;
+                            if(j == CIMWD-1)
+                                nearby[ni*3+2] = imgPart[i+ni-1][0]>> 7 & 1;
+                            else
+                                nearby[ni*3+2] = imgPart[i+ni-1][j+1]>> 7 & 1;
                             for(int nj = 0; nj < 2; nj ++) {
                                 nearby[ni*3+nj] = imgPart[i+ni-1][j]>>(b+1-nj) & 1;
                             }
