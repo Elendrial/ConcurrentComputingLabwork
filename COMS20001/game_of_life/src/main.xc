@@ -15,8 +15,8 @@
 #define  PTNM (IMHT%PTHT != 0 ? IMHT/PTHT+1 : IMHT/PTHT)  //number of image parts
 
 
-    char infname[] = "test.pgm";        //put your input image path here
-    char outfname[] = "testout.pgm";    //put your output image path here
+char infname[] = "test0.pgm";        //put your input image path here
+char outfname[] = "testout.pgm";    //put your output image path here
 
 typedef unsigned char uchar;      //using uchar as shorthand
 
@@ -74,9 +74,9 @@ void dataInStream(char infname[], chanend toDistributor){
         _readinline( line, IMWD );
         for( int x = 0; x < IMWD; x++ ) {
             toDistributor <: line[ x ];
-            printf( "-%4.1d ", line[ x ] ); //show image values
+//            printf( "-%4.1d ", line[ x ] ); //show image values
         }
-        printf( "\n" );
+        printf( "%d lines loaded\n", y);
     }
 
     //Close PGM image file
@@ -155,19 +155,19 @@ int isAliveNextRound(int i[9]){
 
 
 void callWorkers(int index, uchar image[PTHT+2][CIMWD], uchar newimage[PTHT][CIMWD], chanend toWorker) {
-    printf("dist assigning %d!!!\n",index);fflush(stdout);
+//    printf("dist assigning %d!!!\n",index);fflush(stdout);
     for(int i = 0; i < PTHT+2; i ++) {
         for(int j = 0; j < CIMWD; j ++)
             toWorker <: image[i][j];
     }
-    printf("dist assigned %d!!!\n",index);fflush(stdout);
-    printf("dist receiving %d!!!\n",index);fflush(stdout);
+//    printf("dist assigned %d!!!\n",index);fflush(stdout);
+//    printf("dist receiving %d!!!\n",index);fflush(stdout);
     for(int i = 0; i < PTHT; i ++) {
         for(int j = 0; j < CIMWD; j ++) {
             toWorker :> newimage[i][j];
         }
     }
-    printf("dist received %d!!!\n",index);fflush(stdout);
+//    printf("dist received %d!!!\n",index);fflush(stdout);
 }
 
 
@@ -292,7 +292,7 @@ void imgPartWorker(chanend fromDistributor) {
         }
 
         // receive from distributor
-        printf("worker receiving!!!\n");fflush(stdout);
+//        printf("worker receiving!!!\n");fflush(stdout);
         for(int i = 0; i < PTHT+2; i ++){
             for(int j = 0; j < CIMWD; j++)
                 fromDistributor :> imgPart[i][j];
@@ -307,12 +307,13 @@ void imgPartWorker(chanend fromDistributor) {
 //            printf( "\n" );
 //        }
 
-        printf("worker processing!!!\n");fflush(stdout);
+//        printf("worker processing!!!\n");fflush(stdout);
         // process image
         int nearby[9];
         for(int i = 1; i <= PTHT; i ++) {
             for(int j = 0; j < CIMWD; j++){
                 for(int b = 7; b >= 0; b --) {
+                    // At the left-most bit of each compressed col pack
                     if(b == 7){
                         for(int ni = 0; ni < 3; ni ++) {
                             nearby[ni*3] = imgPart[i+ni-1][(j+CIMWD-1)%CIMWD] & 1;
@@ -321,9 +322,10 @@ void imgPartWorker(chanend fromDistributor) {
                             }
                         }
                     }
+                    // At the right-most bit of each compressed col pack
                     else if(b == 0){
                         for(int ni = 0; ni < 3; ni ++) {
-                            nearby[ni*3+2] = imgPart[i+ni-1][(j+CIMWD+1)%CIMWD] & 1;
+                            nearby[ni*3+2] = imgPart[i+ni-1][(j+CIMWD+1)%CIMWD]>> 7 & 1;
                             for(int nj = 0; nj < 2; nj ++) {
                                 nearby[ni*3+nj] = imgPart[i+ni-1][j]>>(b+1-nj) & 1;
                             }
@@ -336,20 +338,21 @@ void imgPartWorker(chanend fromDistributor) {
                             }
                         }
                     }
-//                    if(isAliveNextRound(nearby)) {
-//                        printf("%d %d: %d\n",i-1 , j*8+7-b,imgPart[i][j]>>b & 1);fflush(stdout);
-//                        for(int ii = 0; ii < 9; ii ++)
-//                            {printf("%d ",nearby[ii]);fflush(stdout);}
-//                        printf("\n");fflush(stdout);
-//                    }
+                    if(isAliveNextRound(nearby)) {
+                        printf("%d %d: %d\n",i-1 , j*8+7-b,imgPart[i][j]>>b & 1);fflush(stdout);
+                        for(int ii = 0; ii < 9; ii ++)
+                            {printf("%d ",nearby[ii]);fflush(stdout);}
+                        printf("\n");fflush(stdout);
+                    }
                     newImgPart[i-1][j] <<= 1;
                     newImgPart[i-1][j] += isAliveNextRound(nearby);
                 }
             }
+//            printf("One line solved\n");
         }
 
         // send result to distributor
-        printf("worker sending!!!\n");fflush(stdout);
+//        printf("worker sending!!!\n");fflush(stdout);
         for(int i = 0; i < PTHT; i ++)
             for(int j = 0; j < CIMWD; j++)
                 fromDistributor <: newImgPart[i][j];
@@ -360,6 +363,8 @@ void imgPartWorker(chanend fromDistributor) {
 
 
 void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend toleds, chanend dataIn){
+    timer tmr;
+    uint32_t start, end;
     int running = 0;
 
     while(running == 0){
@@ -379,6 +384,7 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     int paused = 0; // 0: not paused           1: paused
     int toExport = 0;
     int rounds = 0;
+    tmr :> start;
     while(1){
         select{
             case toDistributor :> input:
@@ -429,6 +435,14 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                 // Shouldn't be anything, may just delete
                 break;
         }
+
+        if(rounds == 100) {
+            tmr :> end;
+            printf("Time for 100 rounds: %u s", (long long)(end-start)/100000000);
+
+            exit(1);
+        }
+        //if(rounds == 99) {toExport = 1;rounds++;}
     }
 
 
@@ -456,13 +470,13 @@ void controlLEDs(out port p, chanend fromController) {
         case 2:
             toPort = 0;
             p <: toPort;
-            waitMoment(50000000);
+            waitMoment(50000);
             toPort = 1;			   // Normal green light
             p <: toPort;
-            waitMoment(50000000);
+            waitMoment(50000);
             toPort = 0;
             p <: toPort;
-            waitMoment(50000000);
+            waitMoment(50000);
             toPort = 1;
             break;
 
