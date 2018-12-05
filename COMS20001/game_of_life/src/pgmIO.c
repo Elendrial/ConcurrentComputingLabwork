@@ -9,16 +9,13 @@ int _openinpgm(char fname[], int width, int height)
 {
 	char str[ 64 ];
     int inwidth, inheight;
-    printf( "openinpgm called");
 	_INFP = fopen( fname, "rb" );
 	if( _INFP == NULL )
 	{
 		printf( "Could not open %s.\n", fname );
 		return -1;
 	}
-	else {
-	    printf("opend pic");
-	}
+
 	//Strip off header
     fgets( str, 64, _INFP ); //Version: P5
     fgets( str, 64, _INFP ); //width and height

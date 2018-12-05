@@ -185,10 +185,9 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
     //Starting up and wait for tilting of the xCore-200 Explorer
     printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
 
-    //Read in and do something with your image values..
-    //This just inverts every pixel, but you should
-    //change the image according to the "Game of Life"
     printf( "Waiting for image...\n" );
+
+    // Receive and bit-pack the image
     for( int y = 0; y < IMHT; y++ ) {   //go through all lines
         for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
             fromController :> c;    //read the pixel value
@@ -235,6 +234,7 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
             for( int i = 0; i < PTNM; i ++ ) {
                 for( int y = 0; y < PTHT; y++ ) {
                     for( int x = 0; x < CIMWD; x++ ) {
+                        if(i*PTHT + y >= IMHT)  continue;
                         image[i*PTHT + y][x] = newImgPart[i][y][x];
                         for(int b = 7; b >=0; b --) {
                             printf( "-%4.1d ", (image[i*PTHT + y][x]>>b & 1) * 255 );
