@@ -8,15 +8,15 @@
 #include "i2c.h"
 #include <stdbool.h>
 
-#define  IMHT 64                   //image height
-#define  IMWD 64                   //image width
-#define  PTHT 8                   //image part height
+#define  IMHT 512                   //image height
+#define  IMWD 512                   //image width
 #define  CIMWD IMWD/8               //compressed image width
+#define  PTHT (IMHT % 11 != 0 ? IMHT/11 + 1 : IMHT/11)    //image part height - NB: IMHT/PTHT <= 11   MUST BE TRUE
 #define  PTNM (IMHT%PTHT != 0 ? IMHT/PTHT+1 : IMHT/PTHT)  //number of image parts
 
 
-char infname[] = "64x64.pgm";        //put your input image path here
-char outfname[] = "testout.pgm";    //put your output image path here
+char infname[] = "512x512.pgm";        //put your input image path here
+char outfname[] = "512x512out.pgm";    //put your output image path here
 
 typedef unsigned char uchar;      //using uchar as shorthand
 
@@ -76,7 +76,7 @@ void dataInStream(char infname[], chanend toDistributor){
             toDistributor <: line[ x ];
 //            printf( "-%4.1d ", line[ x ] ); //show image values
         }
-        printf( "%d lines loaded\n", y);
+        if(y % 10 == 0) printf( "%d lines loaded\n", y); // Prints are costly AF apparently
     }
 
     //Close PGM image file
@@ -102,7 +102,7 @@ void dataOutStream(char outfname[], chanend c_in){
     res = _openoutpgm( outfname, IMWD, IMHT );
 
     if( res ) {
-        printf( "DataOutStream: Error opening %s\n.", outfname );fflush(stdout);
+        printf( "DataOutStream: Error opening %s\n", outfname );fflush(stdout);
         return;
     }
 //    else{
@@ -115,7 +115,7 @@ void dataOutStream(char outfname[], chanend c_in){
             c_in :> line[ x ];
         }
         _writeoutline( line, IMWD );
-        printf( "DataOutStream: Line written...\n" );
+    //    printf( "DataOutStream: Line written...\n" );
     }
 
     //Close the PGM image
@@ -266,7 +266,7 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
 //                    printf( "\n" );
                 }
             }
-            printf( "\nOne processing round completed...\n" );
+//            printf( "\nOne processing round completed...\n" );
         }
 
         else if(process == 2){ // 2: export the 'image'
@@ -275,12 +275,9 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
                 for( int x = 0; x < CIMWD; x++ ) {
                     for(int b = 7; b >= 0; b --) {
                         uchar c = (image[y][x]>>b & 1) * 255;
-                        printf("%d ",(image[y][x]>>b & 1) * 255);
                         fromController <: c; // Send the image to dataOut
-                        //fromController <: (uchar)0;
                     }
                 }
-                printf("\n");
             }
 
             // Tell the controller that we're done exporting.
@@ -380,7 +377,7 @@ void imgPartWorker(chanend fromDistributor) {
                     newImgPart[i-1][j] += isAliveNextRound(nearby);
                 }
             }
-//            printf("One line solved\n");
+  //          printf("One line solved\n");
         }
 
         // send result to distributor
@@ -394,9 +391,10 @@ void imgPartWorker(chanend fromDistributor) {
 
 
 
-void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend toleds, chanend dataIn){
+void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend toleds){
     timer tmr;
     uint32_t start, end;
+    long long actualTime = 0;
     int running = 0;
 
     while(running == 0){
@@ -415,7 +413,7 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     int input;
     int paused = 0; // 0: not paused           1: paused
     int toExport = 0;
-    int rounds = 0;
+    int rounds = 0, roundsToTest = 100;
     tmr :> start;
     while(1){
         select{
@@ -452,7 +450,7 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                     break;
                 case 1: // Set paused on
                     paused = 1;
-                    printf("Pausing... processed %d rounds so far.\n", rounds);fflush(stdout);
+                    printf("Pausing... processed %d rounds so far in %u.\n", rounds, actualTime/100000000);fflush(stdout);
                     break;
                 }
 
@@ -462,19 +460,24 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                 if(input == 13) // 13: button sw2
                     toExport = 1;
                 break;
-
-            case dataIn :> input:
-                // Shouldn't be anything, may just delete
-                break;
         }
 
-        if(rounds == 101) {
+        // Every 5 rounds, update the current timer, as the tmr can only count for ~42 seconds according to the documentation.
+        if(rounds % 5 == 0){
             tmr :> end;
-            printf("Time for 100 rounds: %u s", (long long)(end-start)/100000000);
-
-            exit(1);
+            actualTime += end-start;
+            tmr :> start;
         }
-        if(rounds == 100) {toExport = 1;rounds++;}
+
+        // Once we've exported, exit the program
+        if(rounds == roundsToTest+1) {exit(1);}
+        // If we've gone through all the test rounds, forcably export
+        if(rounds == roundsToTest) {
+            tmr :> end;
+            printf("Time for %d rounds: %u ms\n", roundsToTest, actualTime/100000);
+            toExport = 1;
+            rounds++;
+        }
     }
 
 
@@ -588,18 +591,21 @@ int main(void) {
 
     i2c_master_if i2c[1];               //interface to orientation
 
-    chan c_orientation, c_buttonListener, c_distributor, c_leds, c_controllerIn, c_worker[PTNM];    //extend your channel definitions here
+    chan c_orientation, c_buttonListener, c_distributor, c_leds, c_worker[PTNM];    //extend your channel definitions here
 
     par {
+        // Tiles not all being 0 are so that the worker threads can be spread over both cores
         on tile[0]: i2c_master(i2c, 1, p_scl, p_sda, 10);                   //server thread providing orientation data
         on tile[0]: orientation(i2c[0], c_orientation);                     //client thread reading orientation data
         on tile[0]: buttonListener(buttons, c_buttonListener);              //thread reading button information data
         on tile[0]: controlLEDs(leds, c_leds);                              //thread setting LEDs
-        on tile[0]: distributor(c_distributor, c_worker);  //thread to coordinate work on image
+        on tile[1]: distributor(c_distributor, c_worker);                   //thread to coordinate work on image
+
         par(int i = 0; i < PTNM; i ++) {                        // threads to process image
-            on tile[1]: imgPartWorker(c_worker[i]);
+            on tile[(i+1)%2]: imgPartWorker(c_worker[i]);
         }
-        on tile[0]: controller(c_distributor, c_orientation, c_buttonListener, c_leds, c_controllerIn); // Controller thread.
+
+        on tile[1]: controller(c_distributor, c_orientation, c_buttonListener, c_leds); // Controller thread.
     }
 
     return 0;
