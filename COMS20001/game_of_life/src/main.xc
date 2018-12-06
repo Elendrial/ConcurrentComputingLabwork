@@ -356,7 +356,7 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     }
 
     int input;
-    int paused = 0; // 0: not paused           1: paused
+    int paused = 0, wasPaused = 0; // 0: not paused           1: paused
     int toExport = 0;
     int rounds = 0, roundsToTest = 100;
     tmr :> start;
@@ -366,20 +366,36 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                 switch(input){
                 case 1: // Asking whether to processs
                     if(toExport == 1){
+                        tmr :> end;			// Save the current time
+                        actualTime += end-start;
+
                         toDistributor <: 2; // Export
                         toleds <: 4;        // Blue light
 
                         dataOutStream(outfname, toDistributor);
                         toExport = 0;
                         toleds <: 0;          // Turn off the leds
+                        tmr :> start;		  // Restart the timer
                     }
                     else{
+                        // If we're not paused, but we were last time, restart the timer
+                        if(paused == 0 && wasPaused == 1){
+                            wasPaused = 0;
+                            tmr :> start;
+                        }
+                        // If we are paused, but we weren't last time, stop the timer.
+                        else if(paused == 1 && wasPaused == 0){
+                            tmr :> end;
+                            actualTime += end-start;
+                            wasPaused = 1;
+                        }
+
                         toDistributor <: paused;
                         if(paused == 0) rounds ++;
                     }
 
-         //           if(paused == 0) toleds <: 2; // If not paused, flash to indicate processing.
-         //           else 			toleds <: 3; // If paused, show Red light
+                    if(paused == 0) toleds <: 2; // If not paused, flash to indicate processing.
+                    else 			toleds <: 3; // If paused, show Red light
                     break;
                 }
 
