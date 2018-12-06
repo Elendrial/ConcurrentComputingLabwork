@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include "pgmIO.h"
 #include "i2c.h"
-#include <stdbool.h>
 
 #define  IMHT 512                   //image height
 #define  IMWD 512                   //image width
@@ -60,7 +59,7 @@ void dataInStream(char infname[], chanend toDistributor){
     res = _openinpgm( infname, IMWD, IMHT );
 //    printf("dataIn tried open pgm\n");fflush(stdout);
     if( res ) {
-        printf( "DataInStream: Error openening %s\n.", infname );
+        printf( "DataInStream: Error opening %s\n", infname );
         return;
     }
 //    else{
