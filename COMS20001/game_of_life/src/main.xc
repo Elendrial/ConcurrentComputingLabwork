@@ -7,15 +7,15 @@
 #include "pgmIO.h"
 #include "i2c.h"
 
-#define  IMHT 16                   //image height
-#define  IMWD 16                   //image width
-#define  CIMWD IMWD/8               //compressed image width
-#define  PTHT (IMHT % PTNM != 0 ? IMHT/PTNM + 1 : IMHT/PTNM)    //image part height - NB: IMHT/PTHT <= 11   MUST BE TRUE
-#define  PTNM 8  //number of image parts
+#define  IMHT 16                   						  //image height
+#define  IMWD 16                  						  //image width
+#define  CIMWD IMWD/8              						  //compressed image width
+#define  PTHT (IMHT % 11 != 0 ? IMHT/11 + 1 : IMHT/11)    //image part height - NB: IMHT/PTHT <= 11   MUST BE TRUE
+#define  PTNM (IMHT/PTHT)  								  //number of image parts
 
 
-char infname[] = "test.pgm";        //put your input image path here
-char outfname[] = "16out.pgm";    //put your output image path here
+char infname[] = "test.pgm";      // input image path
+char outfname[] = "16out.pgm";    // output image path
 
 typedef unsigned char uchar;      //using uchar as shorthand
 
@@ -36,7 +36,11 @@ on tile[0] : out port leds = XS1_PORT_4F;   //port to access xCore-200 LEDs
 #define FXOS8700EQ_OUT_Z_MSB 0x5
 #define FXOS8700EQ_OUT_Z_LSB 0x6
 
-//WAIT function
+/////////////////////////////////////////////////////////////////////////////////////////
+//
+// Wait for 'n' processor cycles, where each cycle takes ten nano seconds
+//
+/////////////////////////////////////////////////////////////////////////////////////////
 void waitMoment(int tenNano) {
     timer tmr;
     int waitTime;
@@ -155,6 +159,7 @@ void receiveFromWorkers(int index, uchar newimage[PTHT][CIMWD], chanend toWorker
     }
 }
 
+// This function was for testing sending data to workers in a par. It is not used in the current program.
 void callWorkers(int index, uchar image[PTHT+2][CIMWD], uchar newimage[PTHT][CIMWD], chanend toWorker) {
     assignToWorkers(index, image, toWorker);
     receiveFromWorkers(index, newimage, toWorker);
@@ -192,8 +197,9 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
         fromController :> process;
         uchar imgPart[PTNM][PTHT+2][CIMWD], newImgPart[PTNM][PTHT][CIMWD];
 
-        if(process == 0){ // 0: process normally
-            // Split the image
+        if(process == 0){ // 0: Process the image
+
+            // Split the image into strips that can be passed to workers.
             for(int index = 0; index < PTNM; index ++) {
                 for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
                     for(int j = 0; j < CIMWD; j ++)
@@ -201,10 +207,12 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
                 }
             }
 
-            // Let workers process image parts
+            // Pass the image strips to the workers
             for(int index = 0; index < PTNM; index ++){
                 assignToWorkers(index, imgPart[index], toWorker[index]);
             }
+
+            // Receive the updated image strips from the workers
             for(int index = 0; index < PTNM; index ++){
                 receiveFromWorkers(index, newImgPart[index], toWorker[index]);
             }
@@ -212,7 +220,7 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
 //              callWorkers(index, imgPart[index], newImgPart[index], toWorker[index]);
 //          }
 
-            // Combine image parts
+            // Combine the image parts
             for( int i = 0; i < PTNM; i ++ ) {
                 for( int y = 0; y < PTHT; y++ ) {
                     for( int x = 0; x < CIMWD; x++ ) {
@@ -411,7 +419,7 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                     break;
                 case 1: // Set paused on
                     paused = 1;
-                    printf("Pausing... processed %d rounds so far in %u.\n", rounds, actualTime/100000000);fflush(stdout);
+                    printf("Pausing... processed %d rounds so far in %u seconds.\n", rounds, actualTime/100000000);fflush(stdout);
                     break;
                 }
 
@@ -464,13 +472,13 @@ void controlLEDs(out port p, chanend fromController) {
         case 2:
             toPort = 0;
             p <: toPort;
-            waitMoment(50000);
+            waitMoment(500000);
             toPort = 1;			   // Normal green light
             p <: toPort;
-            waitMoment(50000);
+            waitMoment(500000);
             toPort = 0;
             p <: toPort;
-            waitMoment(50000);
+            waitMoment(500000);
             toPort = 1;
             break;
 
