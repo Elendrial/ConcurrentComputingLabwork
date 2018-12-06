@@ -365,7 +365,7 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
     int input;
     int paused = 0, wasPaused = 0; // 0: not paused           1: paused
     int toExport = 0;
-    int rounds = 0, roundsToTest = 100;
+    int rounds = 0;
     tmr :> start;
     while(1){
         select{
@@ -435,14 +435,6 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
             tmr :> end;
             actualTime += end-start;
             tmr :> start;
-        }
-
-        // If we've gone through all the test rounds, forcably export
-        if(rounds == roundsToTest) {
-            tmr :> end;
-            printf("Time for %d rounds: %u ms\n", roundsToTest, actualTime/100000);
-            toExport = 1;
-            rounds++;
         }
     }
 }
