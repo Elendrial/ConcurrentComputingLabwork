@@ -7,15 +7,15 @@
 #include "pgmIO.h"
 #include "i2c.h"
 
-#define  IMHT 512                   //image height
-#define  IMWD 512                   //image width
+#define  IMHT 16                   //image height
+#define  IMWD 16                   //image width
 #define  CIMWD IMWD/8               //compressed image width
-#define  PTHT (IMHT % 11 != 0 ? IMHT/11 + 1 : IMHT/11)    //image part height - NB: IMHT/PTHT <= 11   MUST BE TRUE
-#define  PTNM (IMHT%PTHT != 0 ? IMHT/PTHT+1 : IMHT/PTHT)  //number of image parts
+#define  PTHT (IMHT % PTNM != 0 ? IMHT/PTNM + 1 : IMHT/PTNM)    //image part height - NB: IMHT/PTHT <= 11   MUST BE TRUE
+#define  PTNM 8  //number of image parts
 
 
-char infname[] = "512x512.pgm";        //put your input image path here
-char outfname[] = "512x512out.pgm";    //put your output image path here
+char infname[] = "test.pgm";        //put your input image path here
+char outfname[] = "16out.pgm";    //put your output image path here
 
 typedef unsigned char uchar;      //using uchar as shorthand
 
@@ -57,23 +57,16 @@ void dataInStream(char infname[], chanend toDistributor){
 
     //Open PGM file
     res = _openinpgm( infname, IMWD, IMHT );
-//    printf("dataIn tried open pgm\n");fflush(stdout);
     if( res ) {
         printf( "DataInStream: Error opening %s\n", infname );
         return;
     }
-//    else{
-//        printf( "DataIn: Opened pic successfully\n" );
-//    }
-//
-//    printf( "DataInStream: Reading image.\n");fflush(stdout);
 
     //Read image line-by-line and send byte by byte to channel c_out
     for( int y = 0; y < IMHT; y++ ) {
         _readinline( line, IMWD );
         for( int x = 0; x < IMWD; x++ ) {
             toDistributor <: line[ x ];
-//            printf( "-%4.1d ", line[ x ] ); //show image values
         }
         if(y % 10 == 0) printf( "%d lines loaded\n", y); // Prints are costly AF apparently
     }
@@ -104,9 +97,6 @@ void dataOutStream(char outfname[], chanend c_in){
         printf( "DataOutStream: Error opening %s\n", outfname );fflush(stdout);
         return;
     }
-//    else{
-//        printf("opened img\n");fflush(stdout);
-//    }
 
     //Compile ea ch line of the image and write the image line-by-line
     for( int y = 0; y < IMHT; y++ ) {
@@ -114,7 +104,6 @@ void dataOutStream(char outfname[], chanend c_in){
             c_in :> line[ x ];
         }
         _writeoutline( line, IMWD );
-    //    printf( "DataOutStream: Line written...\n" );
     }
 
     //Close the PGM image
@@ -124,8 +113,11 @@ void dataOutStream(char outfname[], chanend c_in){
     return;
 }
 
-/////// The Rules of Game of Life
-
+/////////////////////////////////////////////////////////////////////////////////////////
+//
+// The implementation of rules of Game of Life
+//
+/////////////////////////////////////////////////////////////////////////////////////////
 int isAliveNextRound(int i[9]){
     int middleAlive = i[4];
     int amountAlive = 0;
@@ -141,34 +133,13 @@ int isAliveNextRound(int i[9]){
     else if(!middleAlive && amountAlive == 3) alive = 1;
 
     return alive;
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //
-// Start your implementation by changing this function to implement the game of life
-// by farming out parts of the image to worker threads who implement it...
-// Currently the function just inverts the image
+// Distributor
 //
 /////////////////////////////////////////////////////////////////////////////////////////
-
-
-void callWorkers(int index, uchar image[PTHT+2][CIMWD], uchar newimage[PTHT][CIMWD], chanend toWorker) {
-//    printf("dist assigning %d!!!\n",index);fflush(stdout);
-    for(int i = 0; i < PTHT+2; i ++) {
-        for(int j = 0; j < CIMWD; j ++)
-            toWorker <: image[i][j];
-    }
-//    printf("dist assigned %d!!!\n",index);fflush(stdout);
-//    printf("dist receiving %d!!!\n",index);fflush(stdout);
-    for(int i = 0; i < PTHT; i ++) {
-        for(int j = 0; j < CIMWD; j ++) {
-            toWorker :> newimage[i][j];
-        }
-    }
-//    printf("dist received %d!!!\n",index);fflush(stdout);
-}
-
 void assignToWorkers(int index, uchar image[PTHT+2][CIMWD], chanend toWorker){
     for(int i = 0; i < PTHT+2; i ++) {
         for(int j = 0; j < CIMWD; j ++)
@@ -184,27 +155,30 @@ void receiveFromWorkers(int index, uchar newimage[PTHT][CIMWD], chanend toWorker
     }
 }
 
+void callWorkers(int index, uchar image[PTHT+2][CIMWD], uchar newimage[PTHT][CIMWD], chanend toWorker) {
+    assignToWorkers(index, image, toWorker);
+    receiveFromWorkers(index, newimage, toWorker);
+}
+
 void distributor(chanend fromController, chanend toWorker[PTNM]){
     uchar image[IMHT][CIMWD], c;
 
-    // init
-    for( int y = 0; y < IMHT; y++ ) {   //go through all lines
-        for( int x = 0; x < CIMWD; x++ ) { //go through each pixel per line
+    // Initialize memory for image so it's ready for bit packing
+    for( int y = 0; y < IMHT; y++ ) {       //go through all lines
+        for( int x = 0; x < CIMWD; x++ ) {  //go through each pixel per line
             image[y][x] = 0;
         }
     }
 
-
     //Starting up and wait for tilting of the xCore-200 Explorer
     printf( "ProcessImage: Start, size = %dx%d\n", IMHT, IMWD );
-
     printf( "Waiting for image...\n" );
 
     // Receive and bit-pack the image
-    for( int y = 0; y < IMHT; y++ ) {   //go through all lines
-        for( int x = 0; x < IMWD; x++ ) { //go through each pixel per line
-            fromController :> c;    //read the pixel value
-            image[y][x/8] <<= 1;
+    for( int y = 0; y < IMHT; y++ ) {       //go through all lines
+        for( int x = 0; x < IMWD; x++ ) {   //go through each pixel per line
+            fromController :> c;            //read the pixel value
+            image[y][x/8] <<= 1;            //bit pack
             if(c == 255)
                 image[y][x/8] ++;
         }
@@ -219,7 +193,7 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
         uchar imgPart[PTNM][PTHT+2][CIMWD], newImgPart[PTNM][PTHT][CIMWD];
 
         if(process == 0){ // 0: process normally
-            // Spliting the image
+            // Split the image
             for(int index = 0; index < PTNM; index ++) {
                 for(int i = index*PTHT - 1; i <= (index+1)*PTHT; i ++) {
                     for(int j = 0; j < CIMWD; j ++)
@@ -227,30 +201,16 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
                 }
             }
 
-//            for(int index = 0; index < PTNM; index ++){
-//                for( int y = 1; y <= PTHT; y ++) {   //go through all lines
-//                       for( int x = 0; x < CIMWD; x++ ) {
-//                           printf("%d %d: %d;  ",y-1, x, imgPart[index][y][x]);
-//                       }
-//                       printf("\n");
-//                }
-//                printf("\nchunck\n");
-//            }
-
-
             // Let workers process image parts
-//            par(int index = 0; index < PTNM; index ++){
-//                callWorkers(index, imgPart[index], newImgPart[index], toWorker[index]);
-//            }
-
             for(int index = 0; index < PTNM; index ++){
                 assignToWorkers(index, imgPart[index], toWorker[index]);
             }
-
             for(int index = 0; index < PTNM; index ++){
                 receiveFromWorkers(index, newImgPart[index], toWorker[index]);
             }
-
+//          par(int index = 0; index < PTNM; index ++){
+//              callWorkers(index, imgPart[index], newImgPart[index], toWorker[index]);
+//          }
 
             // Combine image parts
             for( int i = 0; i < PTNM; i ++ ) {
@@ -258,17 +218,12 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
                     for( int x = 0; x < CIMWD; x++ ) {
                         if(i*PTHT + y >= IMHT)  continue;
                         image[i*PTHT + y][x] = newImgPart[i][y][x];
-//                        for(int b = 7; b >=0; b --) {
-//                            printf( "-%4.1d ", (image[i*PTHT + y][x]>>b & 1) * 255 );
-//                        }
                     }
-//                    printf( "\n" );
                 }
             }
-//            printf( "\nOne processing round completed...\n" );
         }
 
-        else if(process == 2){ // 2: export the 'image'
+        else if(process == 2){  // 2: export the 'image'
             fromController <: 0; // Give it any information to tell it we're about to export.
             for( int y = 0; y < IMHT; y++ ) {
                 for( int x = 0; x < CIMWD; x++ ) {
@@ -278,7 +233,6 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
                     }
                 }
             }
-
             // Tell the controller that we're done exporting.
             fromController <: 0;
         }
@@ -293,72 +247,68 @@ void distributor(chanend fromController, chanend toWorker[PTNM]){
                         }
                     }
                 }
-
-                printf("Alive cells: %d\n", alive); // TODO: Add timer
+                printf("Alive cells: %d\n", alive);
             }
             waitMoment(25000000); // wait quarter of a second
         }
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+//
+// Worker
+//
+/////////////////////////////////////////////////////////////////////////////////////////
 void imgPartWorker(chanend fromDistributor) {
     uchar imgPart[PTHT+2][CIMWD], newImgPart[PTHT][CIMWD];
     while(1) {
-        // init
+        // Initialize the memory for result
         for(int i = 0; i < PTHT; i ++){
             for(int j = 0; j < CIMWD; j++)
                 newImgPart[i][j] = 0;
         }
 
-        // receive from distributor
-//        printf("worker receiving!!!\n");fflush(stdout);
+        // Receive from distributor
         for(int i = 0; i < PTHT+2; i ++){
             for(int j = 0; j < CIMWD; j++)
                 fromDistributor :> imgPart[i][j];
         }
 
-//        for( int y = 1; y <= PTHT; y++ ) {
-//            for( int x = 0; x < CIMWD; x++ ) {
-//                for(int b = 7; b >=0; b --) {
-//                    printf( "%d ", imgPart[y][x]>>b & 1 );
-//                }
-//            }
-//            printf( "\n" );
-//        }
-
-//        printf("worker processing!!!\n");fflush(stdout);
-        // process image
+        // Process image
         int nearby[9];
         for(int i = 1; i <= PTHT; i ++) {
             for(int j = 0; j < CIMWD; j++){
+                // For each bit in a colum pack, get the 8 bits around it
                 for(int b = 7; b >= 0; b --) {
-                    // At the left-most bit of each compressed col pack
+                    // At the left-most bit of each compressed colum pack
                     if(b == 7){
                         for(int ni = 0; ni < 3; ni ++) {
-//                            if(i == 10 && j == 0) {
-//                                printf("* %d %d: %d %d \n",(j+CIMWD-1)%CIMWD, (0+2-1)%2, j, CIMWD);
-//                            }
-                            if(j == 0)
+                            if(j == 0) // When it is the left-most of the whole image
+                                // Get the right-most bit of the whole image
                                 nearby[ni*3] = imgPart[i+ni-1][CIMWD-1] & 1;
-                            else
+                            else        // When it is the left-most of the rest packs
+                                // Get the right-most bit of the previous pack
                                 nearby[ni*3] = imgPart[i+ni-1][j-1] & 1;
                             for(int nj = 1; nj < 3; nj ++) {
                                 nearby[ni*3+nj] = imgPart[i+ni-1][j]>>(b+1-nj) & 1;
                             }
                         }
                     }
-                    // At the right-most bit of each compressed col pack
+
+                    // At the right-most bit of each compressed col pack, similiar logic as above
                     else if(b == 0){
                         for(int ni = 0; ni < 3; ni ++) {
-                            if(j == CIMWD-1)
+                            if(j == CIMWD-1)    // When it is the right-most of the whole image
                                 nearby[ni*3+2] = imgPart[i+ni-1][0]>> 7 & 1;
-                            else
+                            else                // When it is the right-most of the rest packs
                                 nearby[ni*3+2] = imgPart[i+ni-1][j+1]>> 7 & 1;
                             for(int nj = 0; nj < 2; nj ++) {
                                 nearby[ni*3+nj] = imgPart[i+ni-1][j]>>(b+1-nj) & 1;
                             }
                         }
                     }
+
+                    // For the rest, similiar logic as above
                     else {
                         for(int ni = 0; ni < 3; ni ++) {
                             for(int nj = 0; nj < 3; nj ++) {
@@ -366,30 +316,26 @@ void imgPartWorker(chanend fromDistributor) {
                             }
                         }
                     }
-//                    if(isAliveNextRound(nearby)) {
-//                        printf("%d %d: %d\n",i-1 , j*8+7-b,imgPart[i][j]>>b & 1);fflush(stdout);
-//                        for(int ii = 0; ii < 9; ii ++)
-//                            {printf("%d ",nearby[ii]);fflush(stdout);}
-//                        printf("\n");fflush(stdout);
-//                    }
+
+                    // check if the bit is alive next round and pack into the result image
                     newImgPart[i-1][j] <<= 1;
                     newImgPart[i-1][j] += isAliveNextRound(nearby);
                 }
             }
-  //          printf("One line solved\n");
         }
 
-        // send result to distributor
-//        printf("worker sending!!!\n");fflush(stdout);
+        // Send result to distributor
         for(int i = 0; i < PTHT; i ++)
             for(int j = 0; j < CIMWD; j++)
                 fromDistributor <: newImgPart[i][j];
     }
 }
 
-
-
-
+/////////////////////////////////////////////////////////////////////////////////////////
+//
+// Controller
+//
+/////////////////////////////////////////////////////////////////////////////////////////
 void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromButtonListener, chanend toleds){
     timer tmr;
     uint32_t start, end;
@@ -432,8 +378,8 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
                         if(paused == 0) rounds ++;
                     }
 
-                    if(paused == 0) toleds <: 2; // If not paused, flash to indicate processing.
-                    else 			toleds <: 3; // If paused, show Red light
+         //           if(paused == 0) toleds <: 2; // If not paused, flash to indicate processing.
+         //           else 			toleds <: 3; // If paused, show Red light
                     break;
                 }
 
@@ -478,13 +424,11 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
             rounds++;
         }
     }
-
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //
-// Buttons
+// Buttons & LEDs
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -522,8 +466,6 @@ void controlLEDs(out port p, chanend fromController) {
     }
 }
 
-
-
 //READ BUTTONS and send button pattern to userAnt
 void buttonListener(in port b, chanend toController) {
     int r;
@@ -538,7 +480,7 @@ void buttonListener(in port b, chanend toController) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //
-// Initialise and  read orientation, send first tilt event to channel
+// Initialise and read orientation, send first tilt event to channel
 //
 /////////////////////////////////////////////////////////////////////////////////////////
 void orientation(client interface i2c_master_if i2c, chanend toController) {
