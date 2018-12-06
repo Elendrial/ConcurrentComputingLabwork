@@ -10,7 +10,7 @@
 #define  IMHT 16                   						  //image height
 #define  IMWD 16                  						  //image width
 #define  CIMWD IMWD/8              						  //compressed image width
-#define  PTHT (IMHT % 11 != 0 ? IMHT/11 + 1 : IMHT/11)    //image part height - NB: IMHT/PTHT <= 11   MUST BE TRUE
+#define  PTHT (IMHT % 11 != 0 ? IMHT/11 + 1 : IMHT/11)    //image part height - NB: IMHT/PTHT <= 11
 #define  PTNM (IMHT/PTHT)  								  //number of image parts
 
 
@@ -45,7 +45,7 @@ void waitMoment(int tenNano) {
     timer tmr;
     int waitTime;
     tmr :> waitTime;                       //read current timer value
-    waitTime += tenNano;                  //set waitTime to 0.4s after value
+    waitTime += tenNano;                   //set waitTime to 0.4s after value
     tmr when timerafter(waitTime) :> void; //wait until waitTime is reached
 }
 
@@ -72,7 +72,6 @@ void dataInStream(char infname[], chanend toDistributor){
         for( int x = 0; x < IMWD; x++ ) {
             toDistributor <: line[ x ];
         }
-        if(y % 10 == 0) printf( "%d lines loaded\n", y); // Prints are costly AF apparently
     }
 
     //Close PGM image file
@@ -438,8 +437,6 @@ void controller(chanend toDistributor, chanend fromAccelerometer, chanend fromBu
             tmr :> start;
         }
 
-        // Once we've exported, exit the program
-        if(rounds == roundsToTest+1) {exit(1);}
         // If we've gone through all the test rounds, forcably export
         if(rounds == roundsToTest) {
             tmr :> end;
